@@ -1,206 +1,153 @@
 
-# CompliPack Landing Page UI Rebuild
+
+# CompliPack Landing Page - Next.js App Router Integration
 
 ## Overview
-Rebuild the landing page (/) to match the provided screenshots exactly, implementing a premium dark-mode SaaS design with glassmorphism effects, neon-green borders, and all required sections.
+Integrate the existing CompliPack UI components from `src/components/landing/` into the Next.js 14 App Router, replacing the current SignalCard content. This is a UI-only update - no build scripts or configuration changes.
 
-## Design System Analysis (from screenshots)
+## Current State Analysis
+- **Existing Components**: All landing page components already exist in `src/components/landing/`:
+  - `Header.tsx`, `Hero.tsx`, `Features.tsx`, `HowItWorks.tsx`
+  - `Pricing.tsx`, `ComparePlans.tsx`, `FAQ.tsx`, `CTA.tsx`, `Footer.tsx`
+- **Design System**: Complete dark theme with glassmorphism already defined in `src/index.css`
+- **Problem**: `app/page.tsx` currently renders SignalCard content instead of CompliPack
 
-### Color Palette
-- **Background**: Deep navy gradient (#0a1628 to #0d1b2a)
-- **Card backgrounds**: Semi-transparent dark blue with blur (rgba(15, 25, 45, 0.8))
-- **Primary accent (CTA)**: Electric blue (#3b82f6 / #2563eb)
-- **Success/Compliance**: Neon green (#22c55e / #4ade80)
-- **Text primary**: White (#ffffff)
-- **Text secondary**: Light gray (#94a3b8)
-- **Card borders**: Subtle neon-green glow (rgba(74, 222, 128, 0.3))
+## Files to Modify
 
-### Visual Effects
-- Glassmorphism cards with backdrop-blur
-- Neon-green border glow on feature cards
-- Gradient backgrounds with subtle depth
-- Hover effects: scale(1.02) + enhanced glow
-- Smooth fade-in animations
+### 1. `app/globals.css`
+Replace the current light SignalCard theme with the CompliPack dark theme:
 
----
-
-## Implementation Structure
-
-### File Changes
-
-#### 1. Update CSS Theme (`src/index.css`)
-- Define dark theme as default
-- Add custom CSS variables for CompliPack colors
-- Add glassmorphism utility classes
-- Add animation keyframes for fade-in effects
-
-#### 2. Create New Landing Page (`src/pages/Landing.tsx`)
-Complete landing page with all sections:
-
-**Header Component**
-- CompliPack logo (cube icon + text)
-- Navigation: Features, How it Works, Pricing, FAQ, Compliance dropdown
-- Right side: Theme toggle, Login, Start Free Trial (blue gradient button)
-
-**Hero Section**
-- Left side:
-  - "EU Compliance Made Simple" pill badge (green)
-  - H1: "PPWR, Digital Product Passport and Green Claims compliance for EU webshops"
-  - Subtext about generating compliance PDFs
-  - 4 bullet points with icons (PPWR, DPP, Green Claims, QR codes)
-  - Footer text about small webshops
-- Right side:
-  - Glass card showing "Order #12847" with compliance status
-  - PPWR badge, Compliant indicator
-  - Recommended Box dimensions
-  - Void Space percentage (18%)
-  - Progress bar (82% efficient)
-  - DPP indicator badge
-
-**Features Section**
-- Title: "Everything You Need for EU Compliance" (green highlight)
-- Subtitle about manual-first tools
-- 3-column grid of glass cards:
-  - PPWR Compliance (blue icon)
-  - DPP Generation (green icon)
-  - QR Code Labels (yellow icon)
-- Each card has neon-green border
-
-**How It Works Section**
-- Title: "How It Works"
-- Subtitle: "Get compliant in three simple steps"
-- 3-step horizontal flow with connecting dots:
-  1. Upload Your Products (blue icon)
-  2. Run Compliance Check (green icon)
-  3. Download Reports (yellow icon)
-- Each step in glass card with step number badge
-
-**Pricing Section**
-- Section header: "Built for Small EU Webshops" (green)
-- Subtitle about no integrations
-- 14-day free trial note
-- 3 pricing cards:
-  - **Basic** (€19/mo): PPWR only
-  - **Standard** (€39/mo): PPWR + DPP, "Most Popular" badge
-  - **Pro** (€69/mo): Full suite with Green Claims
-- Each card lists features with checkmarks
-- "NEW" badges on Pro features
-
-**Compare Plans Table**
-- Full-width comparison table
-- Features vs Basic/Standard/Pro columns
-- Checkmarks and X marks for feature availability
-- 30-day money-back guarantee note
-
-**FAQ Section**
-- Accordion-style collapsible items
-- 8 questions covering PPWR, DPP, Green Claims, etc.
-- Dark glass cards with chevron icons
-
-**Final CTA Section**
-- Large glass card with green border
-- Title: "Ready to Automate Your EU Compliance?" (green highlight)
-- Subtitle about 500+ businesses
-- Two buttons: Start Free Trial (blue), Talk to Sales (ghost)
-- Trust indicators below buttons
-
-**Footer**
-- 5-column layout:
-  - Logo + description + social icons
-  - Compliance links
-  - Product links
-  - Resources links
-  - Legal links
-- Copyright bar at bottom
-
-#### 3. Create UI Components
-
-**New Components to Create:**
-- `src/components/landing/Header.tsx` - Navigation header
-- `src/components/landing/Hero.tsx` - Hero section with compliance card
-- `src/components/landing/Features.tsx` - Feature cards grid
-- `src/components/landing/HowItWorks.tsx` - 3-step process
-- `src/components/landing/Pricing.tsx` - Pricing cards
-- `src/components/landing/ComparePlans.tsx` - Feature comparison table
-- `src/components/landing/FAQ.tsx` - Accordion FAQ
-- `src/components/landing/CTA.tsx` - Final call-to-action
-- `src/components/landing/Footer.tsx` - Site footer
-
-**UI Components Needed:**
-- `src/components/ui/accordion.tsx` - For FAQ section
-
-#### 4. Update Routing (`src/App.tsx`)
-- Replace Dashboard with Landing on "/" route
-- Keep other routes intact
-
----
-
-## Technical Details
-
-### Glass Card Styling
 ```css
-.glass-card {
-  background: rgba(15, 30, 50, 0.6);
-  backdrop-filter: blur(12px);
-  border: 1px solid rgba(74, 222, 128, 0.2);
-  border-radius: 16px;
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* CompliPack Dark Theme */
+    --background: 222 47% 7%;
+    --foreground: 210 40% 98%;
+    --card: 220 45% 10%;
+    --card-foreground: 210 40% 98%;
+    --primary: 217 91% 60%;
+    --primary-foreground: 210 40% 98%;
+    --secondary: 220 45% 15%;
+    --secondary-foreground: 210 40% 98%;
+    --muted: 220 30% 20%;
+    --muted-foreground: 215 20% 65%;
+    --accent: 142 71% 45%;
+    --accent-foreground: 144 80% 10%;
+    --border: 220 30% 20%;
+    --ring: 142 71% 45%;
+    --radius: 0.75rem;
+  }
+
+  body {
+    @apply bg-background text-foreground antialiased;
+    background: linear-gradient(180deg, 
+      hsl(222 47% 7%) 0%, 
+      hsl(220 50% 5%) 50%,
+      hsl(222 47% 7%) 100%
+    );
+  }
+}
+
+/* Glass card utilities, animations, etc. */
+```
+
+### 2. `app/layout.tsx`
+Update metadata and fonts for CompliPack branding:
+
+```tsx
+export const metadata: Metadata = {
+  title: "CompliPack - EU PPWR & DPP Compliance Software",
+  description: "Generate legally sufficient EU compliance PDFs and QR codes for your products. PPWR packaging compliance, Digital Product Passports, and Green Claims detection."
+};
+
+// Update html lang to "en" for EU compliance focus
+```
+
+### 3. `app/page.tsx`
+Replace SignalCard content with CompliPack landing page:
+
+```tsx
+import Header from "@/components/landing/Header";
+import Hero from "@/components/landing/Hero";
+import Features from "@/components/landing/Features";
+import HowItWorks from "@/components/landing/HowItWorks";
+import Pricing from "@/components/landing/Pricing";
+import ComparePlans from "@/components/landing/ComparePlans";
+import FAQ from "@/components/landing/FAQ";
+import CTA from "@/components/landing/CTA";
+import Footer from "@/components/landing/Footer";
+
+export default function HomePage() {
+  return (
+    <main className="min-h-screen">
+      <Header />
+      <Hero />
+      <Features />
+      <HowItWorks />
+      <Pricing />
+      <ComparePlans />
+      <FAQ />
+      <CTA />
+      <Footer />
+    </main>
+  );
 }
 ```
 
-### Hover Effects
-```css
-.card-hover:hover {
-  transform: scale(1.02);
-  border-color: rgba(74, 222, 128, 0.5);
-  box-shadow: 0 0 30px rgba(74, 222, 128, 0.1);
-}
+## Component Structure (Already Exists)
+
+```text
+src/components/landing/
+├── Header.tsx      - Navigation with CompliPack logo, nav links, CTAs
+├── Hero.tsx        - SEO H1, feature bullets, compliance card visual
+├── Features.tsx    - 3 glass cards (PPWR, DPP, QR)
+├── HowItWorks.tsx  - 3-step horizontal flow with connectors
+├── Pricing.tsx     - 3 pricing tiers with feature lists
+├── ComparePlans.tsx- Full comparison table
+├── FAQ.tsx         - Accordion-style Q&A
+├── CTA.tsx         - Final conversion section
+└── Footer.tsx      - Links and branding
 ```
 
-### Typography
-- Headings: font-bold, tracking-tight
-- "Green Claims" text in green color
-- Body text: text-gray-400
+## Design System (Already Defined)
 
-### Responsive Behavior
-- Desktop-first design
-- Stack to single column on mobile
-- Hide compliance card on small screens
-- Collapse pricing cards vertically
+| Element | Style |
+|---------|-------|
+| Background | Deep navy gradient `#0a1628 → #080d15` |
+| Cards | Glassmorphism with 12px blur |
+| Borders | Neon green glow `hsla(142, 71%, 45%, 0.3)` |
+| Primary CTA | Electric blue with glow |
+| Text | White headings, gray-400 body |
+| Hover | Scale 1.02 + enhanced glow |
 
----
+## Visual Hierarchy (Matching Screenshots)
 
-## SEO Implementation
-- Page title: "EU PPWR & DPP Compliance Software - CompliPack"
-- Meta description for EU compliance keywords
-- Semantic HTML with proper heading hierarchy (H1 > H2 > H3)
-- Anchor links for smooth scrolling to sections
+1. **Header**: Fixed, dark with blue CTA button
+2. **Hero**: Split layout - left text, right compliance card
+3. **Features**: 3-column glass cards with icons
+4. **How It Works**: Connected steps with glow dots
+5. **Pricing**: 3 cards, middle highlighted
+6. **Compare Plans**: Full-width table
+7. **FAQ**: Dark accordion
+8. **CTA**: Bordered glass card
+9. **Footer**: Multi-column links
 
----
+## Technical Notes
 
-## Files to Create/Modify
-
-| File | Action |
-|------|--------|
-| `src/index.css` | Modify - Add dark theme, glass effects |
-| `src/pages/Landing.tsx` | Create - Main landing page |
-| `src/components/landing/Header.tsx` | Create |
-| `src/components/landing/Hero.tsx` | Create |
-| `src/components/landing/Features.tsx` | Create |
-| `src/components/landing/HowItWorks.tsx` | Create |
-| `src/components/landing/Pricing.tsx` | Create |
-| `src/components/landing/ComparePlans.tsx` | Create |
-| `src/components/landing/FAQ.tsx` | Create |
-| `src/components/landing/CTA.tsx` | Create |
-| `src/components/landing/Footer.tsx` | Create |
-| `src/components/ui/accordion.tsx` | Create |
-| `src/App.tsx` | Modify - Update "/" route |
-| `index.html` | Modify - Update title/meta |
-
----
+- All imports use `@/components/landing/` path alias
+- Components are React Server Components compatible
+- Tailwind classes handle all styling
+- Existing `src/index.css` utilities will work via shared Tailwind config
 
 ## Constraints Respected
-- No new design system introduced
-- Exact match to screenshot styling
-- Production-ready code
-- No backend logic in this phase
-- SEO-optimized headings and structure
+
+- No package.json changes
+- No build script modifications
+- No Vite configuration
+- UI components only
+- Compatible with Next.js 14 App Router
+
