@@ -9,7 +9,6 @@ const Footer = () => {
         { label: "PPWR Compliance", href: "/ppwr" },
         { label: "Digital Product Passport", href: "/dpp" },
         { label: "Green Claims", href: "/green-claims" },
-        { label: "Compliance Checker", href: "/products" },
       ],
     },
     {
@@ -18,7 +17,6 @@ const Footer = () => {
         { label: "Features", href: "#features" },
         { label: "Pricing", href: "#pricing" },
         { label: "How it Works", href: "#how-it-works" },
-        { label: "FAQ", href: "#faq" },
       ],
     },
     {
@@ -26,8 +24,7 @@ const Footer = () => {
       links: [
         { label: "Documentation", href: "#" },
         { label: "Blog", href: "#" },
-        { label: "EU Regulations Guide", href: "#" },
-        { label: "API Reference", href: "#" },
+        { label: "Help Center", href: "#" },
       ],
     },
     {
@@ -36,7 +33,6 @@ const Footer = () => {
         { label: "Privacy Policy", href: "#" },
         { label: "Terms of Service", href: "#" },
         { label: "Cookie Policy", href: "#" },
-        { label: "GDPR", href: "#" },
       ],
     },
   ];
@@ -54,19 +50,21 @@ const Footer = () => {
               <span className="text-xl font-bold text-foreground">CompliPack</span>
             </Link>
             <p className="text-sm text-muted-foreground mb-6 max-w-xs">
-              EU compliance software for small and mid-size webshops. PPWR, DPP, and Green Claims — simplified.
+              Automate EU packaging compliance (PPWR) and Digital Product Passport (DPP) generation for e-commerce businesses.
             </p>
             {/* Social Links */}
             <div className="flex items-center gap-4">
               <a
                 href="#"
                 className="w-9 h-9 rounded-lg bg-secondary/50 flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
+                aria-label="Twitter"
               >
                 <Twitter className="w-4 h-4" />
               </a>
               <a
                 href="#"
                 className="w-9 h-9 rounded-lg bg-secondary/50 flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
+                aria-label="LinkedIn"
               >
                 <Linkedin className="w-4 h-4" />
               </a>

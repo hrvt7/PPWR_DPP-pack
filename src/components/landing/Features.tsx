@@ -7,21 +7,21 @@ const Features = () => {
       iconColor: "text-primary",
       iconBg: "bg-primary/10",
       title: "PPWR Compliance",
-      description: "Automatic box size optimization to meet EU Article 24 requirements. Keep void space under 40% with smart recommendations.",
+      description: "Automatic box optimization to stay under 40% void space. EU PPWR Article 24 compliant packaging recommendations.",
     },
     {
       icon: FileText,
       iconColor: "text-accent",
       iconBg: "bg-accent/10",
       title: "DPP Generation",
-      description: "Generate Digital Product Passports with structured sustainability data. EU-compliant documentation ready for 2026 requirements.",
+      description: "Digital Product Passports with material composition, carbon footprint, and recyclability scores for your products.",
     },
     {
       icon: QrCode,
       iconColor: "text-yellow-500",
       iconBg: "bg-yellow-500/10",
       title: "QR Code Labels",
-      description: "Print-ready QR codes linking to public verification pages. Scannable by authorities and consumers for instant compliance checks.",
+      description: "Generate print-ready labels with PPWR and DPP QR codes. Customers can scan for instant compliance verification.",
     },
   ];
 
@@ -35,8 +35,8 @@ const Features = () => {
             <span className="text-accent-green">EU Compliance</span>
           </h2>
           <p className="text-lg text-muted-foreground">
-            Manual-first tools designed for small webshops. No complex integrations, 
-            no developer required — just upload your product data and go.
+            Simple, manual-first tools designed for small and growing webshops. 
+            No technical knowledge required.
           </p>
         </div>
 

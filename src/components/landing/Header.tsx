@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { Package, ChevronDown, Menu, X } from "lucide-react";
+import { Package, ChevronDown, Menu, X, Moon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 const Header = () => {
@@ -55,7 +55,7 @@ const Header = () => {
               </button>
               
               {complianceOpen && (
-                <div className="absolute top-full left-0 mt-2 w-56 glass-card p-2 animate-fade-in">
+                <div className="absolute top-full left-0 mt-2 w-56 glass-card neon-border p-2 animate-fade-in">
                   {complianceLinks.map((link) => (
                     <Link
                       key={link.href}
@@ -73,14 +73,19 @@ const Header = () => {
 
           {/* Desktop Actions */}
           <div className="hidden lg:flex items-center gap-4">
+            <button className="p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary/50 transition-colors">
+              <Moon className="w-5 h-5" />
+            </button>
             <Link to="/auth">
               <Button variant="ghost" className="text-muted-foreground hover:text-foreground">
                 Login
               </Button>
             </Link>
-            <Button className="bg-primary hover:bg-primary/90 text-primary-foreground blue-glow">
-              Start Free Trial
-            </Button>
+            <Link to="/auth">
+              <Button className="bg-primary hover:bg-primary/90 text-primary-foreground blue-glow">
+                Start Free Trial
+              </Button>
+            </Link>
           </div>
 
           {/* Mobile Menu Button */}
@@ -127,9 +132,11 @@ const Header = () => {
                     Login
                   </Button>
                 </Link>
-                <Button className="w-full bg-primary hover:bg-primary/90 text-primary-foreground">
-                  Start Free Trial
-                </Button>
+                <Link to="/auth">
+                  <Button className="w-full bg-primary hover:bg-primary/90 text-primary-foreground blue-glow">
+                    Start Free Trial
+                  </Button>
+                </Link>
               </div>
             </nav>
           </div>

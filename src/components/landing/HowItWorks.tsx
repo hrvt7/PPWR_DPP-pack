@@ -3,28 +3,28 @@ import { Upload, CheckCircle, Download } from "lucide-react";
 const HowItWorks = () => {
   const steps = [
     {
-      number: "1",
+      number: "01",
       icon: Upload,
       iconColor: "text-primary",
       iconBg: "bg-primary/10",
       title: "Upload Your Products",
-      description: "Import via Shopify CSV export or add products manually. No API connections needed.",
+      description: "Import via CSV file or paste product data directly. Compatible with Shopify exports.",
     },
     {
-      number: "2",
+      number: "02",
       icon: CheckCircle,
       iconColor: "text-accent",
       iconBg: "bg-accent/10",
       title: "Run Compliance Check",
-      description: "Automatic PPWR void space analysis, DPP data validation, and Green Claims screening.",
+      description: "Our system analyzes dimensions, calculates void space, and checks green claims instantly.",
     },
     {
-      number: "3",
+      number: "03",
       icon: Download,
       iconColor: "text-yellow-500",
       iconBg: "bg-yellow-500/10",
       title: "Download Reports",
-      description: "Get print-ready PDFs with QR codes. Share verification links with customers.",
+      description: "Get professional PDF reports with compliance data and print-ready QR code labels.",
     },
   ];
 
@@ -37,14 +37,14 @@ const HowItWorks = () => {
             How It Works
           </h2>
           <p className="text-lg text-muted-foreground">
-            Get compliant in three simple steps
+            Get compliant in three simple steps. No integrations required.
           </p>
         </div>
 
         {/* Steps */}
         <div className="relative">
           {/* Connecting Line (Desktop) */}
-          <div className="hidden lg:block absolute top-24 left-[16.66%] right-[16.66%] h-0.5">
+          <div className="hidden lg:block absolute top-28 left-[16.66%] right-[16.66%] h-0.5">
             <div className="w-full h-full bg-gradient-to-r from-primary via-accent to-yellow-500 opacity-30" />
             {/* Dots */}
             <div className="absolute top-1/2 left-1/4 -translate-y-1/2 w-3 h-3 rounded-full bg-accent shadow-lg shadow-accent/50" />
@@ -60,7 +60,7 @@ const HowItWorks = () => {
               >
                 <div className="glass-card glass-card-hover neon-border p-8 text-center">
                   {/* Step Number Badge */}
-                  <div className="absolute -top-4 left-1/2 -translate-x-1/2 w-8 h-8 rounded-full bg-accent flex items-center justify-center text-sm font-bold text-accent-foreground shadow-lg shadow-accent/30">
+                  <div className="absolute -top-4 left-1/2 -translate-x-1/2 px-4 py-1 rounded-full bg-secondary border border-border/50 text-sm font-bold text-muted-foreground">
                     {step.number}
                   </div>
                   
@@ -68,6 +68,9 @@ const HowItWorks = () => {
                   <div className={`w-16 h-16 rounded-2xl ${step.iconBg} flex items-center justify-center mx-auto mb-6 mt-2`}>
                     <step.icon className={`w-8 h-8 ${step.iconColor}`} />
                   </div>
+                  
+                  {/* Connecting Dot Below Icon */}
+                  <div className="hidden lg:block absolute left-1/2 -translate-x-1/2 top-[7.5rem] w-2 h-2 rounded-full bg-accent shadow-lg shadow-accent/50" />
                   
                   {/* Title */}
                   <h3 className="text-xl font-bold text-foreground mb-3">
