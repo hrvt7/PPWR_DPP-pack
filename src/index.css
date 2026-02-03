@@ -67,7 +67,7 @@
 
 @layer base {
   * {
-    @apply border-border;
+    border-color: hsl(var(--border));
   }
   
   html {
@@ -75,7 +75,10 @@
   }
   
   body {
-    @apply bg-background text-foreground antialiased;
+    background-color: hsl(var(--background));
+    color: hsl(var(--foreground));
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
     background: linear-gradient(180deg, 
       hsl(222 47% 7%) 0%, 
       hsl(220 50% 5%) 50%,
@@ -88,7 +91,8 @@
 @layer utilities {
   /* Glassmorphism card styles */
   .glass-card {
-    @apply relative overflow-hidden;
+    position: relative;
+    overflow: hidden;
     background: linear-gradient(
       135deg,
       hsla(220, 45%, 12%, 0.8) 0%,
@@ -101,7 +105,7 @@
   }
   
   .glass-card-hover {
-    @apply transition-all duration-300 ease-out;
+    transition: all 0.3s ease-out;
   }
   
   .glass-card-hover:hover {
@@ -213,11 +217,37 @@
   
   /* Section spacing */
   .section-padding {
-    @apply py-20 lg:py-28;
+    padding-top: 5rem;
+    padding-bottom: 5rem;
+  }
+  
+  @media (min-width: 1024px) {
+    .section-padding {
+      padding-top: 7rem;
+      padding-bottom: 7rem;
+    }
   }
   
   /* Container with max width */
   .container-lg {
-    @apply max-w-7xl mx-auto px-4 sm:px-6 lg:px-8;
+    max-width: 80rem;
+    margin-left: auto;
+    margin-right: auto;
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+  
+  @media (min-width: 640px) {
+    .container-lg {
+      padding-left: 1.5rem;
+      padding-right: 1.5rem;
+    }
+  }
+  
+  @media (min-width: 1024px) {
+    .container-lg {
+      padding-left: 2rem;
+      padding-right: 2rem;
+    }
   }
 }
