@@ -1,0 +1,49 @@
+export type Product = {
+  id: string;
+  external_id?: string;
+  source: "manual" | "csv" | "shopify";
+  title: string;
+  description?: string;
+  length_cm: number;
+  width_cm: number;
+  height_cm: number;
+  created_at: Date;
+};
+
+export type PackagingBox = {
+  id: string;
+  name: string;
+  length_cm: number;
+  width_cm: number;
+  height_cm: number;
+};
+
+export type ComplianceReport = {
+  id: string;
+  product_id: string;
+  ppwr_compliant: boolean;
+  empty_space_percent: number;
+  recommended_box_id: string;
+  status: "draft" | "finalized";
+  pdf_url?: string;
+  qr_payload?: string;
+  created_at: Date;
+  finalized_at?: Date;
+};
+
+export type PPWRResult = {
+  compliant: boolean;
+  empty_space_percent: number;
+  recommended_box: PackagingBox;
+  explanation_text: string;
+};
+
+export interface ProductImporter {
+  import(): Promise<Product[]>;
+}
+
+export class ShopifyImporter implements ProductImporter {
+  async import(): Promise<Product[]> {
+    return [];
+  }
+}
