@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { generateCompliancePdf } from "../pdfGenerator";
+import { generateCompliancePdf } from "../pdfGenerator.tsx";
 import type { PackagingBox, Product } from "../types";
 
 const product: Product = {

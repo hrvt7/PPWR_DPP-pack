@@ -5,7 +5,7 @@ import type { ComplianceReport, PackagingBox, Product } from "./types";
 import { calculatePPWRCompliance } from "./ppwrEngine";
 import { buildDppSummary } from "./dppEngine";
 import { buildQrPayload, generateQrPng, generateQrSvg } from "./qrService";
-import { generateCompliancePdf } from "./pdfGenerator";
+import { generateCompliancePdf } from "./pdfGenerator.tsx";
 
 export class ComplianceError extends Error {
   status: number;
