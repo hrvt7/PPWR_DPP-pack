@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getSupabaseServerClient } from "../../../../../lib/supabase";
 import { estimateProductDimensions } from "../../../../../src/compliance/estimateDimensions";
+import { logComplianceAction } from "../../../../../src/compliance/auditLog";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -11,7 +12,8 @@ const schema = z.object({
   product_title: z.string().min(1),
   product_description: z.string().min(1),
   category: z.string().optional(),
-  weight_grams: z.number().positive().optional()
+  weight_grams: z.number().positive().optional(),
+  actor_id: z.string().min(1)
 });
 
 export async function POST(request: Request) {
@@ -48,6 +50,12 @@ export async function POST(request: Request) {
         { status: 500 }
       );
     }
+
+    await logComplianceAction({
+      actor_id: payload.actor_id,
+      action: "ai_estimation",
+      source: "ai"
+    });
 
     return NextResponse.json(estimate);
   } catch (error) {

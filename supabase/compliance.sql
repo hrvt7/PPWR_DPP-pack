@@ -37,3 +37,29 @@ create index if not exists idx_reports_status on compliance_reports (status);
 
 alter table products
   add column if not exists packaging_status text default 'confirmed';
+
+alter table products
+  add column if not exists confirmed_at timestamp with time zone;
+
+alter table products
+  add column if not exists confirmed_by text;
+
+alter table compliance_reports
+  alter column ppwr_compliant drop not null;
+
+alter table compliance_reports
+  alter column empty_space_percent drop not null;
+
+alter table compliance_reports
+  alter column recommended_box_id drop not null;
+
+create table if not exists compliance_audit_log (
+  id text primary key,
+  created_at timestamp with time zone default now(),
+  actor_id text not null,
+  action text not null,
+  source text not null
+);
+
+create index if not exists idx_audit_actor on compliance_audit_log (actor_id);
+create index if not exists idx_audit_action on compliance_audit_log (action);

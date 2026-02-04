@@ -35,6 +35,8 @@ function mapProduct(row: any): Product {
     width_cm: Number(row.width_cm),
     height_cm: Number(row.height_cm),
     packaging_status: row.packaging_status ?? undefined,
+    confirmed_at: row.confirmed_at ? new Date(row.confirmed_at) : undefined,
+    confirmed_by: row.confirmed_by ?? undefined,
     created_at: new Date(row.created_at)
   };
 }
@@ -53,9 +55,15 @@ function mapReport(row: any): ComplianceReport {
   return {
     id: row.id,
     product_id: row.product_id,
-    ppwr_compliant: row.ppwr_compliant,
-    empty_space_percent: Number(row.empty_space_percent),
-    recommended_box_id: row.recommended_box_id,
+    ppwr_compliant:
+      row.ppwr_compliant === null || row.ppwr_compliant === undefined
+        ? null
+        : row.ppwr_compliant,
+    empty_space_percent:
+      row.empty_space_percent === null || row.empty_space_percent === undefined
+        ? null
+        : Number(row.empty_space_percent),
+    recommended_box_id: row.recommended_box_id ?? null,
     status: row.status,
     pdf_url: row.pdf_url ?? undefined,
     qr_payload: row.qr_payload ?? undefined,
@@ -148,27 +156,41 @@ export async function importProductsFromCSV(csv: string) {
     trim: true
   }) as Record<string, string>[];
 
-  const products: Product[] = records.map((row) => ({
-    id: nanoid(),
-    external_id: row.external_id || undefined,
-    source: "csv",
-    title: row.title,
-    description: row.description || undefined,
-    length_cm: Number(row.length_cm),
-    width_cm: Number(row.width_cm),
-    height_cm: Number(row.height_cm),
-    created_at: new Date()
-  }));
+  const pickTitle = (row: Record<string, string>) =>
+    row.name || row.title || row.product_name || row.product_title || "";
+  const pickSku = (row: Record<string, string>) =>
+    row.sku || row.SKU || row["Variant SKU"] || row.external_id || "";
+  const parseDimension = (value?: string) => {
+    if (!value) return null;
+    const parsed = Number(value);
+    if (Number.isNaN(parsed) || parsed <= 0) return null;
+    return parsed;
+  };
+
+  const products = records.map((row) => {
+    const title = pickTitle(row);
+    const sku = pickSku(row);
+    const length = parseDimension(row.length_cm);
+    const width = parseDimension(row.width_cm);
+    const height = parseDimension(row.height_cm);
+    const hasDimensions = length !== null && width !== null && height !== null;
+
+    return {
+      id: nanoid(),
+      external_id: sku || undefined,
+      source: "csv" as const,
+      title,
+      description: row.description || undefined,
+      length_cm: length ?? null,
+      width_cm: width ?? null,
+      height_cm: height ?? null,
+      packaging_status: hasDimensions ? "confirmed" : "missing",
+      created_at: new Date()
+    };
+  });
 
   const invalid = products.find(
-    (product) =>
-      !product.title ||
-      Number.isNaN(product.length_cm) ||
-      Number.isNaN(product.width_cm) ||
-      Number.isNaN(product.height_cm) ||
-      product.length_cm <= 0 ||
-      product.width_cm <= 0 ||
-      product.height_cm <= 0
+    (product) => !product.title || !product.external_id
   );
 
   if (invalid) {
@@ -185,6 +207,7 @@ export async function importProductsFromCSV(csv: string) {
       length_cm: product.length_cm,
       width_cm: product.width_cm,
       height_cm: product.height_cm,
+      packaging_status: product.packaging_status ?? "missing",
       created_at: product.created_at.toISOString()
     }))
   );
@@ -215,21 +238,26 @@ export async function generateDraftReport(productId: string) {
     throw new ComplianceError("Product not found", 404);
   }
 
-  const boxes = await listPackagingBoxes();
-  if (!boxes.length) {
-    throw new ComplianceError("No packaging boxes available", 400);
-  }
-
-  const result = calculatePPWRCompliance({ product, boxes });
   const report: ComplianceReport = {
     id: nanoid(),
     product_id: product.id,
-    ppwr_compliant: result.compliant,
-    empty_space_percent: result.empty_space_percent,
-    recommended_box_id: result.recommended_box.id,
+    ppwr_compliant: null,
+    empty_space_percent: null,
+    recommended_box_id: null,
     status: "draft",
     created_at: new Date()
   };
+
+  if (product.packaging_status !== "missing") {
+    const boxes = await listPackagingBoxes();
+    if (!boxes.length) {
+      throw new ComplianceError("No packaging boxes available", 400);
+    }
+    const result = calculatePPWRCompliance({ product, boxes });
+    report.ppwr_compliant = result.compliant;
+    report.empty_space_percent = result.empty_space_percent;
+    report.recommended_box_id = result.recommended_box.id;
+  }
 
   const supabase = getSupabaseClient();
   const { error } = await supabase.from("compliance_reports").insert({
@@ -262,6 +290,22 @@ export async function finalizeReport(reportId: string) {
   const product = await getProductById(report.product_id);
   if (!product) {
     throw new ComplianceError("Product not found", 404);
+  }
+  if (product.packaging_status !== "confirmed") {
+    throw new ComplianceError(
+      "Packaging dimensions must be confirmed before finalization.",
+      400
+    );
+  }
+  if (
+    report.empty_space_percent === null ||
+    report.ppwr_compliant === null ||
+    report.recommended_box_id === null
+  ) {
+    throw new ComplianceError(
+      "Draft report missing compliance data; regenerate draft report.",
+      400
+    );
   }
 
   const box = await getPackagingBoxById(report.recommended_box_id);

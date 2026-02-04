@@ -66,6 +66,15 @@ const styles = StyleSheet.create({
     marginTop: 12,
     fontSize: 9,
     color: "#555"
+  },
+  watermark: {
+    position: "absolute",
+    top: "40%",
+    left: "10%",
+    transform: "rotate(-30deg)",
+    fontSize: 72,
+    color: "#999",
+    opacity: 0.15
   }
 });
 
@@ -78,6 +87,7 @@ export async function generateCompliancePdf(params: {
   dppSummary: { title: string; description: string; dimensions: string };
   qrPng: Buffer;
   timestamp: string;
+  watermarkText?: string;
 }) {
   const {
     product,
@@ -87,7 +97,8 @@ export async function generateCompliancePdf(params: {
     explanation,
     dppSummary,
     qrPng,
-    timestamp
+    timestamp,
+    watermarkText
   } = params;
 
   const qrDataUrl = `data:image/png;base64,${qrPng.toString("base64")}`;
@@ -95,6 +106,9 @@ export async function generateCompliancePdf(params: {
   const document = (
     <Document>
       <Page size="A4" style={styles.page}>
+        {watermarkText ? (
+          <Text style={styles.watermark}>{watermarkText}</Text>
+        ) : null}
         <Text style={styles.title}>PPWR Compliance Report</Text>
         <View style={styles.section}>
           <Text style={styles.label}>Product</Text>
@@ -136,6 +150,9 @@ export async function generateCompliancePdf(params: {
       </Page>
 
       <Page size="A4" style={styles.page}>
+        {watermarkText ? (
+          <Text style={styles.watermark}>{watermarkText}</Text>
+        ) : null}
         <Text style={styles.title}>Digital Product Passport</Text>
         <View style={styles.section}>
           <Text style={styles.label}>Product</Text>

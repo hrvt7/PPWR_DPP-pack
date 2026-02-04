@@ -8,6 +8,8 @@ export type Product = {
   width_cm: number;
   height_cm: number;
   packaging_status?: PackagingStatus;
+  confirmed_at?: Date;
+  confirmed_by?: string;
   created_at: Date;
 };
 
@@ -22,9 +24,9 @@ export type PackagingBox = {
 export type ComplianceReport = {
   id: string;
   product_id: string;
-  ppwr_compliant: boolean;
-  empty_space_percent: number;
-  recommended_box_id: string;
+  ppwr_compliant: boolean | null;
+  empty_space_percent: number | null;
+  recommended_box_id: string | null;
   status: "draft" | "finalized";
   pdf_url?: string;
   qr_payload?: string;
