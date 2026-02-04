@@ -28,16 +28,16 @@ const FAQ = () => {
       answer: "No, CompliPack is a compliance tool that helps you generate documentation and identify potential issues. For complex legal questions or specific regulatory interpretations, we recommend consulting with a qualified legal professional specializing in EU regulations.",
     },
     {
-      question: "How does the product import work?",
+      question: "How do I import my products?",
       answer: "You can import products via Shopify CSV export (go to Admin → Products → Export) or add them manually through our interface. We support all standard Shopify CSV columns including dimensions and weights. Products without complete dimensions will be flagged for manual completion.",
     },
     {
-      question: "Do I need any integrations or API connections?",
-      answer: "No, CompliPack is designed for manual-first workflows. You upload product data via CSV or enter it manually. There are no API integrations required, no webhooks to set up, and no technical knowledge needed.",
+      question: "What happens if my product fails compliance?",
+      answer: "If a product fails PPWR compliance (>40% void space), CompliPack recommends a smaller box size. For Green Claims issues, we provide AI-powered suggestions for compliant wording. You can then update your product data and re-run the compliance check.",
     },
     {
-      question: "What do the QR codes link to?",
-      answer: "Each QR code links to a public verification page hosted by CompliPack. When scanned, customers and authorities can instantly verify your product's compliance status, view PPWR metrics, and access Digital Product Passport data if available.",
+      question: "Can I use CompliPack with platforms other than Shopify?",
+      answer: "Yes! While we offer direct CSV import for Shopify, you can manually enter products from any e-commerce platform. Future updates will include support for WooCommerce, Magento, and other major platforms.",
     },
   ];
 

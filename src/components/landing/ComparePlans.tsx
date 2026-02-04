@@ -2,16 +2,22 @@ import { Check, X } from "lucide-react";
 
 const ComparePlans = () => {
   const features = [
-    { name: "PPWR compliance check", basic: true, standard: true, pro: true },
-    { name: "Public verification page", basic: true, standard: true, pro: true },
-    { name: "Manual product import", basic: true, standard: true, pro: true },
+    { name: "Products limit", basic: "50", standard: "200", pro: "Unlimited" },
+    { name: "PPWR void space check", basic: true, standard: true, pro: true },
+    { name: "Box recommendations", basic: true, standard: true, pro: true },
+    { name: "PDF reports", basic: true, standard: true, pro: true },
+    { name: "QR code generation", basic: true, standard: true, pro: true },
     { name: "Digital Product Passport", basic: false, standard: true, pro: true },
-    { name: "DPP data entry", basic: false, standard: true, pro: true },
+    { name: "DPP data management", basic: false, standard: true, pro: true },
+    { name: "Public verification pages", basic: false, standard: true, pro: true },
+    { name: "CSV import (Shopify)", basic: false, standard: true, pro: true },
     { name: "Green Claims detection", basic: false, standard: false, pro: true },
-    { name: "AI wording suggestions", basic: false, standard: false, pro: true },
-    { name: "Confirmation workflow", basic: false, standard: false, pro: true },
-    { name: "PDF pages", basic: "1", standard: "2", pro: "Full" },
-    { name: "QR codes", basic: "1", standard: "2", pro: "2" },
+    { name: "AI-powered suggestions", basic: false, standard: false, pro: true },
+    { name: "Risk score analysis", basic: false, standard: false, pro: true },
+    { name: "Compliance dashboard", basic: false, standard: false, pro: true },
+    { name: "Email support", basic: true, standard: true, pro: true },
+    { name: "Priority support", basic: false, standard: true, pro: true },
+    { name: "Dedicated support", basic: false, standard: false, pro: true },
   ];
 
   const renderValue = (value: boolean | string) => {
@@ -45,24 +51,16 @@ const ComparePlans = () => {
               <thead>
                 <tr className="border-b border-border/50">
                   <th className="text-left p-4 text-foreground font-semibold">Feature</th>
-                  <th className="text-center p-4">
-                    <div className="flex items-center justify-center gap-2">
-                      <div className="w-2 h-2 rounded-full bg-muted-foreground" />
-                      <span className="text-foreground font-semibold">Basic</span>
-                    </div>
+                  <th className="text-center p-4 text-foreground font-semibold">Basic</th>
+                  <th className="text-center p-4 text-foreground font-semibold relative">
+                    <span className="relative">
+                      Standard
+                      <span className="absolute -top-4 left-1/2 -translate-x-1/2 px-2 py-0.5 rounded-full bg-accent text-accent-foreground text-[10px] font-bold uppercase whitespace-nowrap">
+                        Popular
+                      </span>
+                    </span>
                   </th>
-                  <th className="text-center p-4 relative">
-                    <div className="flex items-center justify-center gap-2">
-                      <div className="w-2 h-2 rounded-full bg-primary" />
-                      <span className="text-foreground font-semibold">Standard</span>
-                    </div>
-                  </th>
-                  <th className="text-center p-4">
-                    <div className="flex items-center justify-center gap-2">
-                      <div className="w-2 h-2 rounded-full bg-yellow-500" />
-                      <span className="text-foreground font-semibold">Pro</span>
-                    </div>
-                  </th>
+                  <th className="text-center p-4 text-foreground font-semibold">Pro</th>
                 </tr>
               </thead>
               <tbody>
@@ -87,7 +85,7 @@ const ComparePlans = () => {
         {/* Money Back Guarantee */}
         <div className="text-center mt-8">
           <p className="text-muted-foreground">
-            💰 30-day money-back guarantee. No questions asked.
+            ✅ 30-day money-back guarantee on all plans. No questions asked.
           </p>
         </div>
       </div>

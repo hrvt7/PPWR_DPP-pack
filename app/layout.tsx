@@ -16,9 +16,9 @@ const body = Work_Sans({
 });
 
 export const metadata: Metadata = {
-  title: "CompliPack - EU PPWR & DPP Compliance Software",
+  title: "SignalCard — AI NFC Business Cards",
   description:
-    "Generate legally sufficient EU compliance PDFs and QR codes for your products. PPWR packaging compliance, Digital Product Passports, and Green Claims detection."
+    "Context-aware NFC/QR business cards that capture leads, trigger follow-ups, and sync to CRM."
 };
 
 export default function RootLayout({
@@ -27,7 +27,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" className={`${display.variable} ${body.variable}`}>
+    <html lang="hu" className={`${display.variable} ${body.variable}`}>
       <body>
         <Providers>{children}</Providers>
       </body>
