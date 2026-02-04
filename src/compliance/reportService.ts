@@ -156,45 +156,142 @@ export async function importProductsFromCSV(csv: string) {
     trim: true
   }) as Record<string, string>[];
 
-  const pickTitle = (row: Record<string, string>) =>
-    row.name || row.title || row.product_name || row.product_title || "";
-  const pickSku = (row: Record<string, string>) =>
-    row.sku || row.SKU || row["Variant SKU"] || row.external_id || "";
-  const parseDimension = (value?: string) => {
+  const total_rows = records.length;
+  if (!total_rows) {
+    return {
+      total_rows: 0,
+      imported: 0,
+      rejected: 0,
+      warnings: [] as { sku: string; reason: string }[]
+    };
+  }
+
+  const headers = Object.keys(records[0] ?? {});
+  const isShopify =
+    headers.includes("Title") || headers.includes("Variant SKU");
+
+  const warnings: { sku: string; reason: string }[] = [];
+  const products: Array<{
+    id: string;
+    external_id: string;
+    source: "csv" | "shopify";
+    title: string;
+    description?: string;
+    length_cm: number | null;
+    width_cm: number | null;
+    height_cm: number | null;
+    packaging_status: "missing" | "confirmed";
+    created_at: Date;
+  }> = [];
+
+  const addWarning = (sku: string, reason: string) => {
+    warnings.push({ sku, reason });
+  };
+
+  const parseNumber = (value?: string) => {
     if (!value) return null;
-    const parsed = Number(value);
+    const parsed = Number(String(value).trim());
     if (Number.isNaN(parsed) || parsed <= 0) return null;
     return parsed;
   };
 
-  const products = records.map((row) => {
-    const title = pickTitle(row);
-    const sku = pickSku(row);
-    const length = parseDimension(row.length_cm);
-    const width = parseDimension(row.width_cm);
-    const height = parseDimension(row.height_cm);
-    const hasDimensions = length !== null && width !== null && height !== null;
+  const normalizeShopifyProduct = (row: Record<string, string>) => {
+    const title = (row["Title"] || row["Handle"] || "").trim();
+    const sku = (row["Variant SKU"] || "").trim();
+    if (!title) {
+      return { ok: false as const, reason: "Missing Title/Handle" };
+    }
+    if (!sku) {
+      return { ok: false as const, reason: "Missing Variant SKU" };
+    }
+
+    const weight =
+      parseNumber(row["Variant Grams"]) ?? parseNumber(row["Variant Weight"]);
+    if (weight === null) {
+      addWarning(sku, "Missing weight; import allowed.");
+    }
+
+    addWarning(
+      sku,
+      "Missing packaging dimensions; set packaging_status=missing."
+    );
 
     return {
+      ok: true as const,
+      product: {
+        id: nanoid(),
+        external_id: sku,
+        source: "shopify" as const,
+        title,
+        description:
+          row["Body (HTML)"] || row["Body"] || row["Description"] || undefined,
+        length_cm: null,
+        width_cm: null,
+        height_cm: null,
+        packaging_status: "missing" as const,
+        created_at: new Date()
+      }
+    };
+  };
+
+  const pickTitle = (row: Record<string, string>) =>
+    (row.name || row.title || row.product_name || row.product_title || "").trim();
+  const pickSku = (row: Record<string, string>) =>
+    (
+      row.sku ||
+      row.SKU ||
+      row["Variant SKU"] ||
+      row.external_id ||
+      ""
+    ).trim();
+
+  let rejected = 0;
+
+  for (const row of records) {
+    if (isShopify) {
+      const normalized = normalizeShopifyProduct(row);
+      if (!normalized.ok) {
+        rejected += 1;
+        continue;
+      }
+      products.push(normalized.product);
+      continue;
+    }
+
+    const title = pickTitle(row);
+    const sku = pickSku(row);
+    if (!title || !sku) {
+      rejected += 1;
+      continue;
+    }
+
+    const length = parseNumber(row.length_cm);
+    const width = parseNumber(row.width_cm);
+    const height = parseNumber(row.height_cm);
+    const hasDimensions = length !== null && width !== null && height !== null;
+    if (!hasDimensions) {
+      addWarning(
+        sku,
+        "Missing packaging dimensions; set packaging_status=missing."
+      );
+    }
+
+    products.push({
       id: nanoid(),
-      external_id: sku || undefined,
+      external_id: sku,
       source: "csv" as const,
       title,
       description: row.description || undefined,
-      length_cm: length ?? null,
-      width_cm: width ?? null,
-      height_cm: height ?? null,
+      length_cm: length,
+      width_cm: width,
+      height_cm: height,
       packaging_status: hasDimensions ? "confirmed" : "missing",
       created_at: new Date()
-    };
-  });
+    });
+  }
 
-  const invalid = products.find(
-    (product) => !product.title || !product.external_id
-  );
-
-  if (invalid) {
-    throw new ComplianceError("Invalid CSV: missing required fields", 400);
+  if (!products.length) {
+    return { total_rows, imported: 0, rejected, warnings };
   }
 
   const { error } = await supabase.from("products").insert(
@@ -216,7 +313,7 @@ export async function importProductsFromCSV(csv: string) {
     throw new ComplianceError("Failed to import products", 500);
   }
 
-  return { imported: products.length, product_ids: products.map((p) => p.id) };
+  return { total_rows, imported: products.length, rejected, warnings };
 }
 
 export async function getReportById(reportId: string) {

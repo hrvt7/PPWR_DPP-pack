@@ -1,49 +1,48 @@
 import type { PackagingStatus } from "./types";
 
 export type PPWRDecision = {
-  compliance_status: "pass" | "fail" | "warning";
+  status: "pass" | "fail" | "warning";
   void_space_percentage: number;
-  explanation: string;
+  reason: string;
+  action_required?: string;
 };
 
 export function decidePPWRCompliance(params: {
   packaging_status: PackagingStatus;
-  void_space_percentage: number | null | undefined;
+  void_space_percentage: number;
 }): PPWRDecision {
   const { packaging_status, void_space_percentage } = params;
 
   if (packaging_status === "missing") {
-    throw new Error("Packaging status is missing; cannot determine compliance.");
-  }
-
-  if (
-    void_space_percentage === null ||
-    void_space_percentage === undefined ||
-    !Number.isFinite(void_space_percentage)
-  ) {
-    throw new Error("Void space percentage is missing or invalid.");
+    return {
+      status: "fail",
+      void_space_percentage,
+      reason: "Packaging dimensions missing",
+      action_required: "Add product dimensions and confirm packaging"
+    };
   }
 
   if (void_space_percentage > 40) {
     return {
-      compliance_status: "fail",
+      status: "fail",
       void_space_percentage,
-      explanation: "Void space exceeds 40% limit."
+      reason: "Void space exceeds 40% limit",
+      action_required: "Use smaller box or adjust packaging"
     };
   }
 
   if (packaging_status === "estimated") {
     return {
-      compliance_status: "warning",
+      status: "warning",
       void_space_percentage,
-      explanation:
-        "Estimated dimensions; void space is within 40%. Merchant confirmation required."
+      reason: "Dimensions estimated, not legally confirmed",
+      action_required: "Merchant must confirm packaging dimensions"
     };
   }
 
   return {
-    compliance_status: "pass",
+    status: "pass",
     void_space_percentage,
-    explanation: "Confirmed dimensions; void space is within 40%."
+    reason: "Packaging compliant with PPWR Article 24"
   };
 }

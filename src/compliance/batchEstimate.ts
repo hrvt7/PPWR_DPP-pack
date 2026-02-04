@@ -1,85 +1,199 @@
 import { getSupabaseServerClient } from "../../lib/supabase";
 import { estimateProductDimensions } from "./estimateDimensions";
+import { logComplianceAction } from "./auditLog";
 
-export type BatchEstimateResult = {
-  total_processed: number;
-  total_estimated: number;
-  skipped: number;
+type BatchEstimateParams = {
+  product_ids?: string[];
+  store_id?: string;
+  actor_id?: string;
+  batch_size?: number;
+  limit?: number;
 };
 
-export async function estimateMissingDimensionsBatch(params: {
-  product_ids?: string[];
-  limit?: number;
-}): Promise<BatchEstimateResult> {
+export type BatchEstimateResult = {
+  requested: number;
+  processed: number;
+  estimated: number;
+  skipped: number;
+  failed: { product_id: string; reason: string }[];
+};
+
+const DEFAULT_BATCH_SIZE = 10;
+const MAX_BATCH_SIZE = 25;
+
+function chunk<T>(items: T[], size: number): T[][] {
+  const result: T[][] = [];
+  for (let i = 0; i < items.length; i += size) {
+    result.push(items.slice(i, i + size));
+  }
+  return result;
+}
+
+function toReason(error: unknown) {
+  if (error instanceof Error) {
+    return error.message;
+  }
+  return "Unknown error";
+}
+
+export async function estimateMissingDimensionsBatch(
+  params: BatchEstimateParams
+): Promise<BatchEstimateResult> {
   const supabase = getSupabaseServerClient();
   if (!supabase) {
     throw new Error("Supabase is not configured");
   }
 
-  const requestedIds = params.product_ids ?? [];
-  const hasExplicitIds = requestedIds.length > 0;
-
-  const query = supabase
-    .from("products")
-    .select("id, title, description, packaging_status")
-    .limit(params.limit ?? 100);
-
-  const { data, error } = hasExplicitIds
-    ? await query.in("id", requestedIds)
-    : await query.eq("packaging_status", "missing");
-
-  if (error) {
-    throw new Error("Failed to load products for estimation");
+  const productIds = (params.product_ids ?? []).filter((id) => id.trim());
+  const storeId = params.store_id?.trim();
+  if (!productIds.length && !storeId) {
+    throw new Error("Either product_ids or store_id is required");
   }
 
-  const products = data ?? [];
+  const batchSize = Math.min(
+    Math.max(params.batch_size ?? DEFAULT_BATCH_SIZE, 1),
+    MAX_BATCH_SIZE
+  );
+  const limit = params.limit ?? (productIds.length ? productIds.length : 1000);
+
+  let products: Array<{
+    id: string;
+    title?: string | null;
+    description?: string | null;
+    packaging_status?: string | null;
+  }> = [];
+
+  if (productIds.length) {
+    const { data, error } = await supabase
+      .from("products")
+      .select("id, title, description, packaging_status")
+      .in("id", productIds);
+    if (error) {
+      throw new Error("Failed to load products for estimation");
+    }
+    products = data ?? [];
+  } else if (storeId) {
+    const baseQuery = supabase
+      .from("products")
+      .select("id, title, description, packaging_status")
+      .limit(limit);
+
+    const primary = await baseQuery.eq("store_id", storeId);
+    if (primary.error) {
+      const fallback = await supabase
+        .from("products")
+        .select("id, title, description, packaging_status")
+        .eq("company_id", storeId)
+        .limit(limit);
+      if (fallback.error) {
+        throw new Error("Failed to load products for estimation");
+      }
+      products = fallback.data ?? [];
+    } else {
+      products = primary.data ?? [];
+    }
+  }
+
   const foundIds = new Set(products.map((product) => product.id));
+  const failed: { product_id: string; reason: string }[] = [];
+  if (productIds.length) {
+    for (const id of productIds) {
+      if (!foundIds.has(id)) {
+        failed.push({ product_id: id, reason: "Not found" });
+      }
+    }
+  }
 
   let skipped = 0;
-  if (hasExplicitIds) {
-    skipped += requestedIds.filter((id) => !foundIds.has(id)).length;
-  }
-
-  let totalEstimated = 0;
+  let processed = 0;
+  let estimated = 0;
 
   for (const product of products) {
     if (product.packaging_status !== "missing") {
       skipped += 1;
-      continue;
     }
+  }
 
-    const title = product.title ?? "";
-    const description = product.description ?? "";
-    if (!title) {
-      skipped += 1;
-      continue;
+  const missingProducts = products.filter(
+    (product) => product.packaging_status === "missing"
+  );
+
+  const chunks = chunk(missingProducts, batchSize);
+  for (const group of chunks) {
+    for (const product of group) {
+      processed += 1;
+      if (!product.title) {
+        failed.push({
+          product_id: product.id,
+          reason: "Missing title"
+        });
+        continue;
+      }
+
+      try {
+        const estimate = await estimateProductDimensions({
+          product_title: product.title,
+          product_description: product.description ?? ""
+        });
+
+        const updatePayload = {
+          length_cm: estimate.estimated_length_cm,
+          width_cm: estimate.estimated_width_cm,
+          height_cm: estimate.estimated_height_cm,
+          estimation_confidence: estimate.confidence,
+          packaging_status: "estimated"
+        };
+
+        let updateResult = await supabase
+          .from("products")
+          .update(updatePayload)
+          .eq("id", product.id);
+
+        if (updateResult.error) {
+          updateResult = await supabase
+            .from("products")
+            .update({
+              length_cm: estimate.estimated_length_cm,
+              width_cm: estimate.estimated_width_cm,
+              height_cm: estimate.estimated_height_cm,
+              packaging_status: "estimated"
+            })
+            .eq("id", product.id);
+        }
+
+        if (updateResult.error) {
+          throw new Error(`Failed to update product ${product.id}`);
+        }
+
+        estimated += 1;
+
+        const actorId = params.actor_id ?? "system";
+        try {
+          await logComplianceAction({
+            actor_id: actorId,
+            action: `ai_estimation:${product.id}`,
+            source: "ai"
+          });
+        } catch (error) {
+          failed.push({
+            product_id: product.id,
+            reason: `Audit log failed: ${toReason(error)}`
+          });
+        }
+      } catch (error) {
+        failed.push({
+          product_id: product.id,
+          reason: toReason(error)
+        });
+      }
     }
-
-    const estimate = await estimateProductDimensions({
-      product_title: title,
-      product_description: description
-    });
-
-    const { error: updateError } = await supabase
-      .from("products")
-      .update({
-        length_cm: estimate.estimated_length_cm,
-        width_cm: estimate.estimated_width_cm,
-        height_cm: estimate.estimated_height_cm,
-        packaging_status: "estimated"
-      })
-      .eq("id", product.id);
-
-    if (updateError) {
-      throw new Error(`Failed to update product ${product.id}`);
-    }
-
-    totalEstimated += 1;
   }
 
   return {
-    total_processed: products.length,
-    total_estimated: totalEstimated,
-    skipped
+    requested: productIds.length ? productIds.length : products.length,
+    processed,
+    estimated,
+    skipped,
+    failed
   };
 }

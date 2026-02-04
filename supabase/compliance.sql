@@ -44,6 +44,9 @@ alter table products
 alter table products
   add column if not exists confirmed_by text;
 
+alter table products
+  add column if not exists confirmed_source text;
+
 alter table compliance_reports
   alter column ppwr_compliant drop not null;
 
@@ -57,6 +60,7 @@ create table if not exists compliance_audit_log (
   id text primary key,
   created_at timestamp with time zone default now(),
   actor_id text not null,
+  product_id text,
   action text not null,
   source text not null
 );
