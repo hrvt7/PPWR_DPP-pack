@@ -34,3 +34,6 @@ create table if not exists compliance_reports (
 create index if not exists idx_products_source on products (source);
 create index if not exists idx_reports_product on compliance_reports (product_id);
 create index if not exists idx_reports_status on compliance_reports (status);
+
+alter table products
+  add column if not exists packaging_status text default 'confirmed';
