@@ -7,6 +7,7 @@ export type Product = {
   length_cm: number;
   width_cm: number;
   height_cm: number;
+  packaging_status?: PackagingStatus;
   created_at: Date;
 };
 
@@ -31,11 +32,21 @@ export type ComplianceReport = {
   finalized_at?: Date;
 };
 
+export type PackagingStatus = "confirmed" | "estimated" | "missing";
+
 export type PPWRResult = {
   compliant: boolean;
   empty_space_percent: number;
   recommended_box: PackagingBox;
   explanation_text: string;
+};
+
+export type StandardBox = {
+  id?: string;
+  name: string;
+  length_cm: number;
+  width_cm: number;
+  height_cm: number;
 };
 
 export interface ProductImporter {

@@ -34,6 +34,7 @@ function mapProduct(row: any): Product {
     length_cm: Number(row.length_cm),
     width_cm: Number(row.width_cm),
     height_cm: Number(row.height_cm),
+    packaging_status: row.packaging_status ?? undefined,
     created_at: new Date(row.created_at)
   };
 }
