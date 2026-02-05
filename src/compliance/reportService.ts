@@ -6,6 +6,7 @@ import { calculatePPWRCompliance } from "./ppwrEngine";
 import { buildDppSummary } from "./dppEngine";
 import { buildQrPayload, generateQrPng, generateQrSvg } from "./qrService";
 import { generateCompliancePdf } from "./pdfGenerator";
+import { calculateCarbonFootprint } from "../../lib/carbon-calculator";
 
 export class ComplianceError extends Error {
   status: number;
@@ -491,5 +492,39 @@ export async function finalizeReport(reportId: string) {
     throw new ComplianceError("Failed to finalize report", 500);
   }
 
+  await createDppRecord({
+    product,
+    reportId: report.id,
+    destinationCountry: null
+  });
+
   return { pdf_url: publicUrl.publicUrl };
+}
+
+async function createDppRecord(params: {
+  product: Product;
+  reportId: string;
+  destinationCountry: string | null;
+}) {
+  const supabase = getSupabaseClient();
+  const weightInGrams = 0;
+  const materialType = "corrugated_cardboard";
+  const carbon = calculateCarbonFootprint(weightInGrams, materialType);
+
+  const { error } = await supabase.from("dpp").insert({
+    id: nanoid(),
+    product_id: params.product.id,
+    report_id: params.reportId,
+    destination_country: params.destinationCountry,
+    carbon_material_co2: carbon.carbonMaterialCo2,
+    carbon_transport_co2: carbon.carbonTransportCo2,
+    carbon_total_co2: carbon.carbonTotalCo2,
+    carbon_calculation_date: carbon.carbonCalculationDate.toISOString(),
+    carbon_calculation_method: carbon.carbonCalculationMethod,
+    created_at: new Date().toISOString()
+  });
+
+  if (error) {
+    throw new ComplianceError("Failed to create DPP record", 500);
+  }
 }

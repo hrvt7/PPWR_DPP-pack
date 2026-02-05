@@ -12,6 +12,7 @@ export const seedProfiles: Profile[] = [
     company: "SignalCard",
     role: "Head of Sales",
     location: "Budapest",
+    countryCode: "HU",
     links: [
       { label: "Foglalj 15 percet", url: "https://cal.com/signalcard", priority: 1 },
       { label: "Case study", url: "https://signalcard.ai/case", priority: 2 },
@@ -29,6 +30,7 @@ export const seedProfiles: Profile[] = [
     company: "SignalCard",
     role: "Technical Lead",
     location: "Budapest",
+    countryCode: "HU",
     links: [
       { label: "API dokumentáció", url: "https://signalcard.ai/docs", priority: 1 },
       { label: "GitHub", url: "https://github.com", priority: 2 },
@@ -46,6 +48,7 @@ export const seedProfiles: Profile[] = [
     company: "SignalCard",
     role: "Co-founder",
     location: "Budapest",
+    countryCode: "HU",
     links: [
       { label: "Investor deck", url: "https://signalcard.ai/deck", priority: 1 },
       { label: "Traction", url: "https://signalcard.ai/traction", priority: 2 },

@@ -7,11 +7,15 @@ create table if not exists profiles (
   company text,
   role text,
   location text,
+  country_code text,
   links jsonb default '[]'::jsonb,
   ctas jsonb default '[]'::jsonb,
   is_default boolean default false,
   created_at timestamp with time zone default now()
 );
+
+alter table profiles
+  add column if not exists country_code text;
 
 create table if not exists cards (
   id text primary key,

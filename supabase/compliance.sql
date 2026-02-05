@@ -67,3 +67,19 @@ create table if not exists compliance_audit_log (
 
 create index if not exists idx_audit_actor on compliance_audit_log (actor_id);
 create index if not exists idx_audit_action on compliance_audit_log (action);
+
+create table if not exists dpp (
+  id text primary key,
+  product_id text,
+  report_id text,
+  destination_country text,
+  created_at timestamp with time zone default now(),
+  carbon_material_co2 numeric,
+  carbon_transport_co2 numeric,
+  carbon_total_co2 numeric,
+  carbon_calculation_date timestamp with time zone,
+  carbon_calculation_method text default 'EU_AVERAGE_LIGHT_V1'
+);
+
+alter table dpp
+  add column if not exists destination_country text;

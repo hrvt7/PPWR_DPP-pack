@@ -15,6 +15,7 @@ export type Profile = {
   company: string;
   role: string;
   location: string;
+  countryCode?: string;
   links: LinkItem[];
   ctas: string[];
   isDefault: boolean;

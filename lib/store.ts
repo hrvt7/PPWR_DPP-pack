@@ -69,6 +69,7 @@ function mapProfile(row: Record<string, any>): Profile {
     company: row.company,
     role: row.role,
     location: row.location,
+    countryCode: row.country_code ?? row.countryCode ?? undefined,
     links: row.links ?? [],
     ctas: row.ctas ?? [],
     isDefault: row.is_default ?? row.isDefault ?? false
