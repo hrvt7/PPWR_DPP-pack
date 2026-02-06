@@ -1,10 +1,9 @@
 import type { PackagingStatus } from "./types";
 
 export type PPWRDecision = {
-  status: "pass" | "fail" | "warning";
+  compliance_status: "pass" | "fail" | "unknown";
   void_space_percentage: number;
-  reason: string;
-  action_required?: string;
+  reasons: string[];
 };
 
 export function decidePPWRCompliance(params: {
@@ -13,36 +12,42 @@ export function decidePPWRCompliance(params: {
 }): PPWRDecision {
   const { packaging_status, void_space_percentage } = params;
 
-  if (packaging_status === "missing") {
+  if (void_space_percentage > 40) {
     return {
-      status: "fail",
+      compliance_status: "fail",
       void_space_percentage,
-      reason: "Packaging dimensions missing",
-      action_required: "Add product dimensions and confirm packaging"
+      reasons: [
+        "Void space exceeds 40% limit",
+        "Use smaller box or adjust packaging"
+      ]
     };
   }
 
-  if (void_space_percentage > 40) {
+  if (packaging_status === "missing") {
     return {
-      status: "fail",
+      compliance_status: "fail",
       void_space_percentage,
-      reason: "Void space exceeds 40% limit",
-      action_required: "Use smaller box or adjust packaging"
+      reasons: [
+        "Packaging dimensions missing",
+        "Add product dimensions and confirm packaging"
+      ]
     };
   }
 
   if (packaging_status === "estimated") {
     return {
-      status: "warning",
+      compliance_status: "unknown",
       void_space_percentage,
-      reason: "Dimensions estimated, not legally confirmed",
-      action_required: "Merchant must confirm packaging dimensions"
+      reasons: [
+        "Dimensions estimated, not legally confirmed",
+        "Merchant must confirm packaging dimensions"
+      ]
     };
   }
 
   return {
-    status: "pass",
+    compliance_status: "pass",
     void_space_percentage,
-    reason: "Packaging compliant with PPWR Article 24"
+    reasons: ["Packaging compliant with PPWR Article 24"]
   };
 }

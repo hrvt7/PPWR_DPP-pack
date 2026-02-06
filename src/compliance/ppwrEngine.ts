@@ -1,4 +1,6 @@
 import type { PackagingBox, PPWRResult, Product } from "./types";
+import { recommendStandardBox } from "./boxRecommendation";
+import { decidePPWRCompliance, type PPWRDecision } from "./ppwrDecision";
 
 function volume(length: number, width: number, height: number) {
   return length * width * height;
@@ -19,6 +21,17 @@ export function calculatePPWRCompliance(params: {
   const { product, boxes } = params;
   if (!boxes.length) {
     throw new Error("No packaging boxes available");
+  }
+
+  if (
+    product.length_cm === null ||
+    product.width_cm === null ||
+    product.height_cm === null ||
+    product.length_cm <= 0 ||
+    product.width_cm <= 0 ||
+    product.height_cm <= 0
+  ) {
+    throw new Error("Product dimensions missing or invalid");
   }
 
   const productVolume = volume(
@@ -65,5 +78,45 @@ export function calculatePPWRCompliance(params: {
     explanation_text: compliant
       ? `Empty space is ${best.emptySpacePercent.toFixed(2)}%, below the 40% threshold.`
       : `Empty space is ${best.emptySpacePercent.toFixed(2)}%, above the 40% threshold.`
+  };
+}
+
+export type PPWRDecisionResult = {
+  recommended_box: PackagingBox;
+  void_space_percentage: number;
+  buffer_percent: number;
+  compliance_status: PPWRDecision["compliance_status"];
+  reasons: string[];
+};
+
+export function buildPPWRDecision(params: {
+  product: Product;
+  boxes: PackagingBox[];
+  packaging_status?: "confirmed" | "estimated" | "missing";
+  buffer_percent?: number;
+}): PPWRDecisionResult {
+  const recommendation = recommendStandardBox({
+    product,
+    boxes,
+    packaging_status: params.packaging_status,
+    buffer_percent: params.buffer_percent
+  });
+
+  if (recommendation.status === "error" || !recommendation.recommended_box) {
+    throw new Error(recommendation.message || "Failed to recommend box");
+  }
+
+  const voidSpace = recommendation.void_space_percentage ?? 0;
+  const decision = decidePPWRCompliance({
+    packaging_status: params.packaging_status ?? product.packaging_status ?? "missing",
+    void_space_percentage: voidSpace
+  });
+
+  return {
+    recommended_box: recommendation.recommended_box as PackagingBox,
+    void_space_percentage: voidSpace,
+    buffer_percent: recommendation.buffer_percent,
+    compliance_status: decision.compliance_status,
+    reasons: decision.reasons
   };
 }

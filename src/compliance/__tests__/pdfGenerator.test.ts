@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { generateCompliancePdf } from "../pdfGenerator";
+import { generateQrPng } from "../qrService";
 import type { PackagingBox, Product } from "../types";
 
 const product: Product = {
@@ -20,13 +21,9 @@ const box: PackagingBox = {
   height_cm: 12
 };
 
-const tinyPng = Buffer.from(
-  "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Y2ZrfcAAAAASUVORK5CYII=",
-  "base64"
-);
-
 describe("PDF generation", () => {
   it("returns a non-empty buffer", async () => {
+    const tinyPng = await generateQrPng("test");
     const buffer = await generateCompliancePdf({
       product,
       box,

@@ -4,9 +4,10 @@ create table if not exists products (
   source text not null,
   title text not null,
   description text,
-  length_cm numeric not null,
-  width_cm numeric not null,
-  height_cm numeric not null,
+  length_cm numeric,
+  width_cm numeric,
+  height_cm numeric,
+  weight_kg numeric,
   created_at timestamp with time zone default now()
 );
 
@@ -37,6 +38,18 @@ create index if not exists idx_reports_status on compliance_reports (status);
 
 alter table products
   add column if not exists packaging_status text default 'confirmed';
+
+alter table products
+  add column if not exists weight_kg numeric;
+
+alter table products
+  alter column length_cm drop not null;
+
+alter table products
+  alter column width_cm drop not null;
+
+alter table products
+  alter column height_cm drop not null;
 
 alter table products
   add column if not exists confirmed_at timestamp with time zone;

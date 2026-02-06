@@ -4,9 +4,10 @@ export type Product = {
   source: "manual" | "csv" | "shopify";
   title: string;
   description?: string;
-  length_cm: number;
-  width_cm: number;
-  height_cm: number;
+  length_cm: number | null;
+  width_cm: number | null;
+  height_cm: number | null;
+  weight_kg?: number | null;
   packaging_status?: PackagingStatus;
   confirmed_at?: Date;
   confirmed_by?: string;

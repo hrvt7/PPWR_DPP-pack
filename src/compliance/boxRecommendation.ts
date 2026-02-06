@@ -34,6 +34,18 @@ export function recommendStandardBox(params: {
   const packagingStatus = params.packaging_status ?? product.packaging_status ?? "confirmed";
   const bufferPercent = params.buffer_percent ?? DEFAULT_BUFFER_PERCENT;
 
+  if (
+    product.length_cm === null ||
+    product.width_cm === null ||
+    product.height_cm === null
+  ) {
+    return {
+      status: "error",
+      message: "Product dimensions missing. Cannot recommend a packaging box.",
+      buffer_percent: bufferPercent
+    };
+  }
+
   if (packagingStatus === "missing") {
     return {
       status: "error",

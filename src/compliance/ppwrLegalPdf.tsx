@@ -161,7 +161,9 @@ export async function generatePPWRLegalPdf(params: {
         </View>
         <View style={styles.section}>
           <Text style={styles.label}>PPWR status</Text>
-          <Text style={styles.badge}>{decision.status.toUpperCase()}</Text>
+          <Text style={styles.badge}>
+            {decision.compliance_status.toUpperCase()}
+          </Text>
         </View>
         <Text style={styles.footer}>
           This report is generated from merchant-provided data and is not legal

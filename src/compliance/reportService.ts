@@ -2,7 +2,7 @@ import { nanoid } from "nanoid";
 import { parse } from "csv-parse/sync";
 import { getSupabaseServerClient } from "../../lib/supabase";
 import type { ComplianceReport, PackagingBox, Product } from "./types";
-import { calculatePPWRCompliance } from "./ppwrEngine";
+import { buildPPWRDecision } from "./ppwrEngine";
 import { buildDppSummary } from "./dppEngine";
 import { buildQrPayload, generateQrPng, generateQrSvg } from "./qrService";
 import { generateCompliancePdf } from "./pdfGenerator";
@@ -32,9 +32,10 @@ function mapProduct(row: any): Product {
     source: row.source,
     title: row.title,
     description: row.description ?? undefined,
-    length_cm: Number(row.length_cm),
-    width_cm: Number(row.width_cm),
-    height_cm: Number(row.height_cm),
+    length_cm: row.length_cm === null ? null : Number(row.length_cm),
+    width_cm: row.width_cm === null ? null : Number(row.width_cm),
+    height_cm: row.height_cm === null ? null : Number(row.height_cm),
+    weight_kg: row.weight_kg === null ? null : Number(row.weight_kg),
     packaging_status: row.packaging_status ?? undefined,
     confirmed_at: row.confirmed_at ? new Date(row.confirmed_at) : undefined,
     confirmed_by: row.confirmed_by ?? undefined,
@@ -111,22 +112,40 @@ export async function getPackagingBoxById(boxId: string) {
 export async function createProductManual(payload: {
   title: string;
   description?: string;
-  length_cm: number;
-  width_cm: number;
-  height_cm: number;
+  length_cm?: number | null;
+  width_cm?: number | null;
+  height_cm?: number | null;
+  weight_kg?: number | null;
   source?: "manual" | "csv" | "shopify";
   external_id?: string;
+  packaging_status?: "confirmed" | "estimated" | "missing";
 }) {
   const supabase = getSupabaseClient();
+  const hasDimensions =
+    payload.length_cm !== null &&
+    payload.length_cm !== undefined &&
+    payload.width_cm !== null &&
+    payload.width_cm !== undefined &&
+    payload.height_cm !== null &&
+    payload.height_cm !== undefined;
+  const packagingStatus = payload.packaging_status ?? (hasDimensions ? "confirmed" : "missing");
+  if (packagingStatus === "confirmed" && !hasDimensions) {
+    throw new ComplianceError(
+      "Packaging status confirmed requires dimensions",
+      400
+    );
+  }
   const product: Product = {
     id: nanoid(),
     external_id: payload.external_id,
     source: payload.source ?? "manual",
     title: payload.title,
     description: payload.description,
-    length_cm: payload.length_cm,
-    width_cm: payload.width_cm,
-    height_cm: payload.height_cm,
+    length_cm: payload.length_cm ?? null,
+    width_cm: payload.width_cm ?? null,
+    height_cm: payload.height_cm ?? null,
+    weight_kg: payload.weight_kg ?? null,
+    packaging_status: packagingStatus,
     created_at: new Date()
   };
 
@@ -139,6 +158,8 @@ export async function createProductManual(payload: {
     length_cm: product.length_cm,
     width_cm: product.width_cm,
     height_cm: product.height_cm,
+    weight_kg: product.weight_kg ?? null,
+    packaging_status: product.packaging_status ?? "missing",
     created_at: product.created_at.toISOString()
   });
 
@@ -229,6 +250,7 @@ export async function importProductsFromCSV(csv: string) {
         length_cm: null,
         width_cm: null,
         height_cm: null,
+        weight_kg: weight === null ? null : Number((weight / 1000).toFixed(4)),
         packaging_status: "missing" as const,
         created_at: new Date()
       }
@@ -269,6 +291,7 @@ export async function importProductsFromCSV(csv: string) {
     const length = parseNumber(row.length_cm);
     const width = parseNumber(row.width_cm);
     const height = parseNumber(row.height_cm);
+    const weightKg = parseNumber(row.weight_kg);
     const hasDimensions = length !== null && width !== null && height !== null;
     if (!hasDimensions) {
       addWarning(
@@ -286,6 +309,7 @@ export async function importProductsFromCSV(csv: string) {
       length_cm: length,
       width_cm: width,
       height_cm: height,
+      weight_kg: weightKg,
       packaging_status: hasDimensions ? "confirmed" : "missing",
       created_at: new Date()
     });
@@ -305,6 +329,7 @@ export async function importProductsFromCSV(csv: string) {
       length_cm: product.length_cm,
       width_cm: product.width_cm,
       height_cm: product.height_cm,
+      weight_kg: product.weight_kg ?? null,
       packaging_status: product.packaging_status ?? "missing",
       created_at: product.created_at.toISOString()
     }))
@@ -336,6 +361,15 @@ export async function generateDraftReport(productId: string) {
     throw new ComplianceError("Product not found", 404);
   }
 
+  if (
+    product.packaging_status !== "missing" &&
+    (product.length_cm === null ||
+      product.width_cm === null ||
+      product.height_cm === null)
+  ) {
+    throw new ComplianceError("Product dimensions missing", 400);
+  }
+
   const report: ComplianceReport = {
     id: nanoid(),
     product_id: product.id,
@@ -351,10 +385,22 @@ export async function generateDraftReport(productId: string) {
     if (!boxes.length) {
       throw new ComplianceError("No packaging boxes available", 400);
     }
-    const result = calculatePPWRCompliance({ product, boxes });
-    report.ppwr_compliant = result.compliant;
-    report.empty_space_percent = result.empty_space_percent;
-    report.recommended_box_id = result.recommended_box.id;
+    const bufferPercent = Number(process.env.PPWR_BUFFER_PERCENT ?? 0.12);
+    const decision = buildPPWRDecision({
+      product: product as Product,
+      boxes,
+      packaging_status: product.packaging_status,
+      buffer_percent: Number.isFinite(bufferPercent) ? bufferPercent : 0.12
+    });
+    report.empty_space_percent = Number(
+      decision.void_space_percentage.toFixed(2)
+    );
+    report.recommended_box_id = decision.recommended_box.id ?? null;
+    if (decision.compliance_status === "unknown") {
+      report.ppwr_compliant = null;
+    } else {
+      report.ppwr_compliant = decision.compliance_status === "pass";
+    }
   }
 
   const supabase = getSupabaseClient();

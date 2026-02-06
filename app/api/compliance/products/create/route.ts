@@ -10,11 +10,13 @@ export const runtime = "nodejs";
 const schema = z.object({
   title: z.string().min(1),
   description: z.string().optional(),
-  length_cm: z.number().positive(),
-  width_cm: z.number().positive(),
-  height_cm: z.number().positive(),
+  length_cm: z.number().positive().optional().nullable(),
+  width_cm: z.number().positive().optional().nullable(),
+  height_cm: z.number().positive().optional().nullable(),
+  weight_kg: z.number().positive().optional().nullable(),
   source: z.enum(["manual", "csv", "shopify"]).optional(),
-  external_id: z.string().optional()
+  external_id: z.string().min(1),
+  packaging_status: z.enum(["confirmed", "estimated", "missing"]).optional()
 });
 
 export async function POST(request: Request) {

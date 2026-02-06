@@ -10,7 +10,7 @@ export type ReportEligibility = {
 export function decideReportEligibility(
   decision: PPWRDecision
 ): ReportEligibility {
-  if (decision.status === "fail") {
+  if (decision.compliance_status === "fail") {
     return {
       state: "blocked",
       can_generate_pdf: false,
@@ -19,7 +19,7 @@ export function decideReportEligibility(
     };
   }
 
-  if (decision.status === "warning") {
+  if (decision.compliance_status === "unknown") {
     return {
       state: "review",
       can_generate_pdf: true,
