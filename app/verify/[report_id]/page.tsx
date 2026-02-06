@@ -77,12 +77,18 @@ export default async function VerifyPage({
     const data = (await response.json()) as {
       report: {
         id: string;
-        ppwr_compliant: boolean;
-        empty_space_percent: number;
+        ppwr_result_json?: {
+          compliance_status?: string;
+          void_space_percentage?: number | null;
+        };
         created_at: string;
       };
       product: { title: string };
     };
+    const complianceStatus =
+      data.report.ppwr_result_json?.compliance_status ?? "unknown";
+    const voidSpace =
+      data.report.ppwr_result_json?.void_space_percentage ?? null;
 
     return (
       <main className="shell">
@@ -96,11 +102,11 @@ export default async function VerifyPage({
           </p>
           <p>
             <strong>Status:</strong>{" "}
-            {data.report.ppwr_compliant ? "Compliant" : "Non-compliant"}
+            {complianceStatus}
           </p>
           <p>
             <strong>Empty space:</strong>{" "}
-            {data.report.empty_space_percent.toFixed(2)}%
+            {typeof voidSpace === "number" ? `${voidSpace.toFixed(2)}%` : "N/A"}
           </p>
           <p>
             <strong>Timestamp:</strong> {new Date(data.report.created_at).toISOString()}

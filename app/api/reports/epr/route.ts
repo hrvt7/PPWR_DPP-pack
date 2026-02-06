@@ -91,16 +91,20 @@ export async function GET(request: Request) {
     .map((row) => row.product_id)
     .filter((id): id is string => Boolean(id));
 
-  let productsMap = new Map<string, { title: string; external_id: string }>();
+  let productsMap = new Map<
+    string,
+    { title: string; external_id: string; packaging_material_type?: string | null }
+  >();
   if (productIds.length) {
     const { data: products } = await supabase
       .from("products")
-      .select("id, title, external_id")
+      .select("id, title, external_id, packaging_material_type")
       .in("id", productIds);
     (products ?? []).forEach((product) => {
       productsMap.set(product.id, {
         title: product.title,
-        external_id: product.external_id ?? ""
+        external_id: product.external_id ?? "",
+        packaging_material_type: product.packaging_material_type ?? null
       });
     });
   }
@@ -108,7 +112,7 @@ export async function GET(request: Request) {
   const rows = (dppRows ?? []).map((row) => {
     const product = row.product_id ? productsMap.get(row.product_id) : null;
     const materialCategory = mapMaterialCategory(
-      row.material_type ?? "",
+      product?.packaging_material_type ?? "",
       config.countryCode
     );
     return {

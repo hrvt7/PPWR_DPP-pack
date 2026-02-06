@@ -19,7 +19,7 @@ export async function POST(request: Request) {
       action: "report_finalization",
       source: "manual"
     });
-    return NextResponse.json({ pdf_url: result.pdf_url });
+    return NextResponse.json(result);
   } catch (error) {
     if (error instanceof ComplianceError) {
       return NextResponse.json({ error: error.message }, { status: error.status });

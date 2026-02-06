@@ -1,7 +1,7 @@
 # CompliPack — PPWR + DPP Compliance Backend
 
 Next.js (App Router) backend for PPWR compliance, Digital Product Passports, and
-verification workflows with PDF + QR assets.
+verification workflows with PDF + QR assets. Backend-only.
 
 ## Quick Start
 
@@ -19,6 +19,9 @@ npm run dev
 - `POST /api/compliance/products/import` → CSV import
 - `POST /api/compliance/products/estimate` → AI dimension estimate
 - `POST /api/compliance/products/confirm` → confirm packaging dimensions
+- `POST /api/integrations/shopify/webhook/order-created` → Shopify order webhook
+- `POST /api/v1/generate-dpp` → universal DPP generation (API key)
+- `POST /api/epr/export` → quarterly EPR export (XLSX + PDF)
 
 ## Environment Variables
 
@@ -34,6 +37,14 @@ OPENAI_API_KEY=
 APP_DOMAIN=
 COMPLIANCE_QR_SECRET=
 COMPLIANCE_STORAGE_BUCKET=compliance-assets
+
+# Shopify
+SHOPIFY_WEBHOOK_SECRET=
+SHOPIFY_ACCESS_TOKEN=
+SHOPIFY_SHOP_DOMAIN=
+
+# Universal API
+# stores in shops.public_api_key
 ```
 
 ## Supabase Schema
@@ -45,3 +56,4 @@ Apply the SQL in:
 
 - Reports finalize deterministically and generate assets once.
 - Verification page uses API fetch only (build-safe).
+- Carbon footprint uses a light estimation method and default distance.

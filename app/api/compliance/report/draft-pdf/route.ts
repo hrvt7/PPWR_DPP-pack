@@ -1,10 +1,9 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getSupabaseServerClient } from "../../../../../lib/supabase";
-import { buildDppSummary } from "../../../../../src/compliance/dppEngine";
-import { generateCompliancePdf } from "../../../../../src/compliance/pdfGenerator";
-import { generateQrPng } from "../../../../../src/compliance/qrService";
-import { getPackagingBoxById, getProductById, getReportById } from "../../../../../src/compliance/reportService";
+import { generatePPWRLegalPdf } from "../../../../../src/compliance/ppwrLegalPdf";
+import { decideReportEligibility } from "../../../../../src/compliance/reportEligibility";
+import { getProductById, getReportById } from "../../../../../src/compliance/reportService";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -41,15 +40,38 @@ export async function POST(request: Request) {
     }
 
     const bucket = process.env.COMPLIANCE_STORAGE_BUCKET ?? "compliance-assets";
-    const qrPng = await generateQrPng(`draft:${report.id}`);
 
-    const hasCompliance =
-      report.empty_space_percent !== null && report.ppwr_compliant !== null;
-    const emptySpace = report.empty_space_percent ?? 0;
-    const compliant = report.ppwr_compliant ?? false;
+    const ppwrResult = report.ppwr_result_json as
+      | {
+          compliance_status?: "pass" | "fail" | "unknown";
+          void_space_percentage?: number | null;
+          reasons?: string[];
+          recommended_box?: {
+            id?: string;
+            name: string;
+            length_cm: number;
+            width_cm: number;
+            height_cm: number;
+          } | null;
+          buffer_percent?: number;
+        }
+      | null;
 
-    const box = report.recommended_box_id
-      ? await getPackagingBoxById(report.recommended_box_id)
+    const decision = {
+      compliance_status: ppwrResult?.compliance_status ?? "unknown",
+      void_space_percentage: ppwrResult?.void_space_percentage ?? 0,
+      reasons: ppwrResult?.reasons ?? ["Compliance pending; dimensions missing."]
+    };
+    const eligibility = decideReportEligibility(decision);
+
+    const box = ppwrResult?.recommended_box
+      ? {
+          id: ppwrResult.recommended_box.id ?? "pending",
+          name: ppwrResult.recommended_box.name,
+          length_cm: ppwrResult.recommended_box.length_cm,
+          width_cm: ppwrResult.recommended_box.width_cm,
+          height_cm: ppwrResult.recommended_box.height_cm
+        }
       : {
           id: "pending",
           name: "Pending",
@@ -58,31 +80,18 @@ export async function POST(request: Request) {
           height_cm: 0
         };
 
-    const dppSummary = buildDppSummary(product);
-    const explanation = hasCompliance
-      ? compliant
-        ? `Empty space is ${emptySpace.toFixed(2)}%, below the 40% threshold.`
-        : `Empty space is ${emptySpace.toFixed(2)}%, above the 40% threshold.`
-      : "Compliance pending; dimensions missing.";
-
-    if (!box) {
-      return NextResponse.json(
-        { error: "Packaging box not available for draft PDF" },
-        { status: 400 }
-      );
-    }
-
-    const timestamp = new Date().toISOString();
-    const pdfBuffer = await generateCompliancePdf({
+    const pdfBuffer = await generatePPWRLegalPdf({
       product,
-      box,
-      emptySpacePercent: emptySpace,
-      compliant,
-      explanation,
-      dppSummary,
-      qrPng,
-      timestamp,
-      watermarkText: "DRAFT"
+      boxRecommendation: {
+        status: "warning",
+        message: decision.reasons.join(" "),
+        buffer_percent: ppwrResult?.buffer_percent ?? 0.12,
+        void_space_percentage: ppwrResult?.void_space_percentage ?? undefined,
+        recommended_box: box
+      },
+      decision,
+      eligibility,
+      verificationUrl: `https://draft.local/verify/${report.id}`
     });
 
     const pdfPath = `reports/${report.id}-draft.pdf`;

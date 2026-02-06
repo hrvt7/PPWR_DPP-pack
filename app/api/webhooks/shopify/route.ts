@@ -66,11 +66,11 @@ export async function POST(request: Request) {
       product_id: null,
       report_id: null,
       destination_country: destinationCountry,
-      carbon_material_co2: carbon.carbonMaterialCo2,
-      carbon_transport_co2: carbon.carbonTransportCo2,
-      carbon_total_co2: carbon.carbonTotalCo2,
-      carbon_calculation_date: carbon.carbonCalculationDate.toISOString(),
-      carbon_calculation_method: carbon.carbonCalculationMethod,
+      carbon_material_co2: carbon.material_kg_co2e,
+      carbon_transport_co2: carbon.transport_kg_co2e,
+      carbon_total_co2: carbon.total_kg_co2e,
+      carbon_calculation_date: new Date().toISOString(),
+      carbon_calculation_method: carbon.methodology_id,
       created_at: new Date().toISOString()
     });
 

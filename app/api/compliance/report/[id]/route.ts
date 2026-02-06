@@ -46,23 +46,35 @@ export async function GET(
     }
 
     const signed = url.searchParams.get("signed") === "1";
-    let assets: { pdf_signed_url: string | null; qr_png_signed_url: string | null } | null =
-      null;
+    let assets:
+      | {
+          pdf_signed_url: string | null;
+          qr_ppwr_signed_url: string | null;
+          qr_dpp_signed_url: string | null;
+        }
+      | null = null;
     if (signed) {
       const supabase = getSupabaseServerClient();
       if (supabase) {
         const bucket = process.env.COMPLIANCE_STORAGE_BUCKET ?? "compliance-assets";
         const pdfPath = `reports/${report.id}.pdf`;
-        const pngPath = `qr/${report.id}.png`;
+        const ppwrPath = `qr/ppwr/${report.id}.png`;
         const pdfSigned = await supabase.storage
           .from(bucket)
           .createSignedUrl(pdfPath, 3600);
-        const pngSigned = await supabase.storage
+        const ppwrSigned = await supabase.storage
           .from(bucket)
-          .createSignedUrl(pngPath, 3600);
+          .createSignedUrl(ppwrPath, 3600);
+
+        const dppPath = extractStoragePath(report.qr_dpp_url ?? "", bucket);
+        const dppSigned =
+          dppPath !== null
+            ? await supabase.storage.from(bucket).createSignedUrl(dppPath, 3600)
+            : null;
         assets = {
           pdf_signed_url: pdfSigned.data?.signedUrl ?? null,
-          qr_png_signed_url: pngSigned.data?.signedUrl ?? null
+          qr_ppwr_signed_url: ppwrSigned.data?.signedUrl ?? null,
+          qr_dpp_signed_url: dppSigned?.data?.signedUrl ?? null
         };
       }
     }
@@ -71,6 +83,19 @@ export async function GET(
       const product = await getProductById(report.product_id);
       if (!product) {
         return NextResponse.json({ error: "Product not found" }, { status: 404 });
+      }
+      if (verify) {
+        return NextResponse.json({
+          report: {
+            id: report.id,
+            ppwr_result_json: report.ppwr_result_json ?? null,
+            dpp_json: report.dpp_json ?? null,
+            carbon_json: report.carbon_json ?? null,
+            created_at: report.created_at
+          },
+          product: { id: product.id, title: product.title },
+          assets
+        });
       }
       return NextResponse.json({
         report,
@@ -85,5 +110,18 @@ export async function GET(
       return NextResponse.json({ error: error.message }, { status: error.status });
     }
     return NextResponse.json({ error: "Failed to fetch report" }, { status: 500 });
+  }
+}
+
+function extractStoragePath(publicUrl: string, bucket: string) {
+  if (!publicUrl) return null;
+  try {
+    const url = new URL(publicUrl);
+    const marker = `/storage/v1/object/public/${bucket}/`;
+    const index = url.pathname.indexOf(marker);
+    if (index === -1) return null;
+    return url.pathname.slice(index + marker.length);
+  } catch {
+    return null;
   }
 }

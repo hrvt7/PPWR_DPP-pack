@@ -8,7 +8,7 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const schema = z.object({
-  product_id: z.string().min(1),
+  product_id: z.string().min(1).optional(),
   product_title: z.string().min(1),
   product_description: z.string().min(1),
   category: z.string().optional(),
@@ -34,21 +34,24 @@ export async function POST(request: Request) {
       weight_grams: payload.weight_grams
     });
 
-    const { error: updateError } = await supabase
-      .from("products")
-      .update({
-        length_cm: estimate.estimated_length_cm,
-        width_cm: estimate.estimated_width_cm,
-        height_cm: estimate.estimated_height_cm,
-        packaging_status: "estimated"
-      })
-      .eq("id", payload.product_id);
+    if (payload.product_id) {
+      const { error: updateError } = await supabase
+        .from("products")
+        .update({
+          length_cm: estimate.estimated_length_cm,
+          width_cm: estimate.estimated_width_cm,
+          height_cm: estimate.estimated_height_cm,
+          packaging_status: "estimated",
+          updated_at: new Date().toISOString()
+        })
+        .eq("id", payload.product_id);
 
-    if (updateError) {
-      return NextResponse.json(
-        { error: "Failed to update product" },
-        { status: 500 }
-      );
+      if (updateError) {
+        return NextResponse.json(
+          { error: "Failed to update product" },
+          { status: 500 }
+        );
+      }
     }
 
     await logComplianceAction({
@@ -57,7 +60,10 @@ export async function POST(request: Request) {
       source: "ai"
     });
 
-    return NextResponse.json(estimate);
+    return NextResponse.json({
+      ...estimate,
+      persisted: Boolean(payload.product_id)
+    });
   } catch (error) {
     if (error instanceof z.ZodError) {
       return NextResponse.json({ error: "Invalid request" }, { status: 400 });
