@@ -5,8 +5,9 @@ import type { ComplianceReport, PackagingBox, Product } from "./types";
 import { buildPPWRDecision } from "./ppwrEngine";
 import { buildDppSummary } from "./dppEngine";
 import { buildQrPayload, generateQrPng, generateQrSvg } from "./qrService";
-import { generateCompliancePdf } from "./pdfGenerator";
+import { generatePPWRLegalPdf } from "./ppwrLegalPdf";
 import { calculateCarbonFootprint } from "../../lib/carbon-calculator";
+import { decideReportEligibility } from "./reportEligibility";
 
 export class ComplianceError extends Error {
   status: number;
@@ -428,7 +429,7 @@ export async function finalizeReport(reportId: string) {
     throw new ComplianceError("Report not found", 404);
   }
   if (report.status === "finalized") {
-    throw new ComplianceError("Report already finalized", 409);
+    return { pdf_url: report.pdf_url ?? "" };
   }
 
   const product = await getProductById(report.product_id);
@@ -468,23 +469,35 @@ export async function finalizeReport(reportId: string) {
   const qrSvg = await generateQrSvg(qrPayload);
   const qrPng = await generateQrPng(qrPayload);
 
-  const timestamp = new Date().toISOString();
-  const dppSummary = buildDppSummary(product);
-  const explanation =
-    report.empty_space_percent >= 100
-      ? "No available box fits the product dimensions. Compliance cannot be achieved."
-      : report.ppwr_compliant
-        ? `Empty space is ${report.empty_space_percent.toFixed(2)}%, below the 40% threshold.`
-        : `Empty space is ${report.empty_space_percent.toFixed(2)}%, above the 40% threshold.`;
-  const pdfBuffer = await generateCompliancePdf({
+  const verificationUrl = qrPayload;
+  const decision = buildPPWRDecision({
+    product: product as Product,
+    boxes: [box],
+    packaging_status: product.packaging_status,
+    buffer_percent: Number(process.env.PPWR_BUFFER_PERCENT ?? 0.12)
+  });
+  const eligibility = decideReportEligibility({
+    compliance_status: decision.compliance_status,
+    void_space_percentage: decision.void_space_percentage,
+    reasons: decision.reasons
+  });
+  const pdfBuffer = await generatePPWRLegalPdf({
     product,
-    box,
-    emptySpacePercent: report.empty_space_percent,
-    compliant: report.ppwr_compliant,
-    explanation,
-    dppSummary,
-    qrPng,
-    timestamp
+    boxRecommendation: {
+      status:
+        product.packaging_status === "estimated" ? "warning" : "final",
+      message: decision.reasons.join(" "),
+      buffer_percent: decision.buffer_percent,
+      void_space_percentage: decision.void_space_percentage,
+      recommended_box: box
+    },
+    decision: {
+      compliance_status: decision.compliance_status,
+      void_space_percentage: decision.void_space_percentage,
+      reasons: decision.reasons
+    },
+    eligibility,
+    verificationUrl
   });
 
   const pdfPath = `reports/${report.id}.pdf`;

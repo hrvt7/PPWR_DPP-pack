@@ -25,7 +25,7 @@ export function decidePPWRCompliance(params: {
 
   if (packaging_status === "missing") {
     return {
-      compliance_status: "fail",
+      compliance_status: "unknown",
       void_space_percentage,
       reasons: [
         "Packaging dimensions missing",

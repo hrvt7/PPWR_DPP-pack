@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { generateCompliancePdf } from "../pdfGenerator";
-import { generateQrPng } from "../qrService";
+import { generatePPWRLegalPdf } from "../ppwrLegalPdf";
 import type { PackagingBox, Product } from "../types";
+import type { BoxRecommendation } from "../boxRecommendation";
+import type { PPWRDecision } from "../ppwrDecision";
+import type { ReportEligibility } from "../reportEligibility";
 
 const product: Product = {
   id: "prod_pdf",
@@ -23,20 +25,30 @@ const box: PackagingBox = {
 
 describe("PDF generation", () => {
   it("returns a non-empty buffer", async () => {
-    const tinyPng = await generateQrPng("test");
-    const buffer = await generateCompliancePdf({
+    const recommendation: BoxRecommendation = {
+      status: "final",
+      message: "Ok",
+      buffer_percent: 0.12,
+      void_space_percentage: 10,
+      recommended_box: box
+    };
+    const decision: PPWRDecision = {
+      compliance_status: "pass",
+      void_space_percentage: 10,
+      reasons: ["Ok"]
+    };
+    const eligibility: ReportEligibility = {
+      state: "final",
+      can_generate_pdf: true,
+      can_publish_qr: true,
+      reason: "ok"
+    };
+    const buffer = await generatePPWRLegalPdf({
       product,
-      box,
-      emptySpacePercent: 10,
-      compliant: true,
-      explanation: "Empty space is 10%",
-      dppSummary: {
-        title: product.title,
-        description: "Sample",
-        dimensions: "10 x 10 x 10 cm"
-      },
-      qrPng: tinyPng,
-      timestamp: new Date().toISOString()
+      boxRecommendation: recommendation,
+      decision,
+      eligibility,
+      verificationUrl: "https://example.com/verify/report_1?hash=abc"
     });
     expect(buffer.length).toBeGreaterThan(100);
   });

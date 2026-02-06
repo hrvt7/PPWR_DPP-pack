@@ -167,7 +167,7 @@ export async function generatePPWRLegalPdf(params: {
         </View>
         <Text style={styles.footer}>
           This report is generated from merchant-provided data and is not legal
-          advice.
+          advice. Carbon footprint uses a light estimate method.
         </Text>
       </Page>
 
