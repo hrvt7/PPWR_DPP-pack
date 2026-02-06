@@ -5,6 +5,7 @@ import * as XLSX from "xlsx";
 import { getSupabaseServerClient } from "../../../../lib/supabase";
 import { mapMaterialCategory } from "../../../../src/compliance/eprReportingService";
 import { generateEprQuarterlyPdf } from "../../../../src/compliance/eprQuarterlyPdf";
+import { ApiKeyError, requireApiKey } from "../../../../src/auth/requireApiKey";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -27,6 +28,15 @@ function parseQuarter(period: string) {
 }
 
 export async function POST(request: Request) {
+  try {
+    await requireApiKey(request);
+  } catch (error) {
+    if (error instanceof ApiKeyError) {
+      return NextResponse.json({ error: error.message }, { status: error.status });
+    }
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   const supabase = getSupabaseServerClient();
   if (!supabase) {
     return NextResponse.json(

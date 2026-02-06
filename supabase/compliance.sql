@@ -157,8 +157,19 @@ create table if not exists epr_quarterly_exports (
 );
 
 create table if not exists shops (
-  id text primary key,
+  id uuid primary key,
+  merchant_id uuid,
   name text,
-  public_api_key text unique,
+  api_key text unique,
+  status text default 'active',
   created_at timestamp with time zone default now()
 );
+
+alter table shops
+  add column if not exists merchant_id uuid;
+
+alter table shops
+  add column if not exists api_key text;
+
+alter table shops
+  add column if not exists status text default 'active';

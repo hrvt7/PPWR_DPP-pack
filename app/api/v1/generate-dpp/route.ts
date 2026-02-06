@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { validatePublicApiKey } from "../../../../lib/auth";
+import { ApiKeyError, requireApiKey } from "../../../../src/auth/requireApiKey";
 import {
   ComplianceError,
   finalizeReport,
@@ -28,14 +28,7 @@ const schema = z.object({
 // - Generate an API key by creating a random token and storing it on the shop row.
 export async function POST(request: Request) {
   try {
-    const apiKey = request.headers.get("x-api-key");
-    const shop = await validatePublicApiKey(apiKey);
-    if (!shop) {
-      return NextResponse.json(
-        { error: "Authentication failed" },
-        { status: 401 }
-      );
-    }
+    await requireApiKey(request);
 
     const payload = schema.parse(await request.json());
     const domain = process.env.APP_DOMAIN ?? "";
@@ -88,6 +81,9 @@ export async function POST(request: Request) {
       results
     });
   } catch (error) {
+    if (error instanceof ApiKeyError) {
+      return NextResponse.json({ error: error.message }, { status: error.status });
+    }
     if (error instanceof ComplianceError) {
       return NextResponse.json({ error: error.message }, { status: error.status });
     }

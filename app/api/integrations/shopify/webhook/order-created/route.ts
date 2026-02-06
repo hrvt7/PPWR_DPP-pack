@@ -1,4 +1,3 @@
-import crypto from "crypto";
 import { NextResponse } from "next/server";
 import {
   ComplianceError,
@@ -6,22 +5,10 @@ import {
   generateDraftReport,
   getProductBySku
 } from "../../../../../../src/compliance/reportService";
+import { verifyShopifyWebhook } from "../../../../../../src/integrations/shopify/verifyWebhook";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-
-function verifyShopifyHmac(rawBody: string, hmacHeader: string | null, secret: string) {
-  if (!hmacHeader) return false;
-  const digest = crypto
-    .createHmac("sha256", secret)
-    .update(rawBody, "utf8")
-    .digest("base64");
-  try {
-    return crypto.timingSafeEqual(Buffer.from(digest), Buffer.from(hmacHeader));
-  } catch {
-    return false;
-  }
-}
 
 export async function POST(request: Request) {
   try {
@@ -29,16 +16,16 @@ export async function POST(request: Request) {
     if (!secret) {
       return NextResponse.json(
         { error: "Webhook secret missing" },
-        { status: 403 }
+        { status: 401 }
       );
     }
 
     const rawBody = await request.text();
     const hmacHeader = request.headers.get("x-shopify-hmac-sha256");
-    if (!verifyShopifyHmac(rawBody, hmacHeader, secret)) {
+    if (!verifyShopifyWebhook(rawBody, hmacHeader, secret)) {
       return NextResponse.json(
         { error: "Invalid webhook signature" },
-        { status: 403 }
+        { status: 401 }
       );
     }
 
@@ -49,7 +36,8 @@ export async function POST(request: Request) {
       shipping_address?: { country_code?: string };
     };
 
-    const destinationCountry = payload.shipping_address?.country_code ?? null;
+    const destinationCountry =
+      payload.shipping_address?.country_code?.toUpperCase() ?? null;
     const items = payload.line_items ?? [];
     const results: Array<{
       sku: string;

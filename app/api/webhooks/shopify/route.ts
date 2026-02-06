@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { nanoid } from "nanoid";
 import { getSupabaseServerClient } from "../../../../lib/supabase";
 import { calculateCarbonFootprint } from "../../../../lib/carbon-calculator";
+import { verifyShopifyWebhook } from "../../../../src/integrations/shopify/verifyWebhook";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -43,8 +44,22 @@ function resolveMaterial(items: ShopifyLineItem[] = []) {
 
 export async function POST(request: Request) {
   try {
-    // TODO: Add HMAC verification for Shopify webhook requests.
-    const payload = (await request.json()) as ShopifyOrderPayload;
+    const secret = process.env.SHOPIFY_WEBHOOK_SECRET;
+    if (!secret) {
+      return NextResponse.json(
+        { error: "Webhook secret missing" },
+        { status: 401 }
+      );
+    }
+    const rawBody = await request.text();
+    const hmacHeader = request.headers.get("x-shopify-hmac-sha256");
+    if (!verifyShopifyWebhook(rawBody, hmacHeader, secret)) {
+      return NextResponse.json(
+        { error: "Invalid webhook signature" },
+        { status: 401 }
+      );
+    }
+    const payload = JSON.parse(rawBody) as ShopifyOrderPayload;
     const supabase = getSupabaseServerClient();
     if (!supabase) {
       return NextResponse.json(
