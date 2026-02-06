@@ -96,3 +96,69 @@ create table if not exists dpp (
 
 alter table dpp
   add column if not exists destination_country text;
+
+-- === CompliPack MVP additions (non-destructive) ===
+alter table products
+  add column if not exists merchant_id uuid;
+
+alter table products
+  add column if not exists sku text;
+
+alter table products
+  add column if not exists product_url text;
+
+alter table products
+  add column if not exists image_url text;
+
+alter table products
+  add column if not exists weight_g integer;
+
+alter table products
+  add column if not exists packaging_material_type text;
+
+alter table products
+  add column if not exists updated_at timestamp with time zone default now();
+
+alter table products
+  alter column packaging_status set default 'missing';
+
+create table if not exists standard_boxes (
+  id text primary key,
+  name text not null,
+  length_cm numeric not null,
+  width_cm numeric not null,
+  height_cm numeric not null,
+  created_at timestamp with time zone default now()
+);
+
+create table if not exists reports (
+  id text primary key,
+  product_id text not null references products(id),
+  kind text not null,
+  status text not null,
+  ppwr_result_json jsonb,
+  dpp_json jsonb,
+  carbon_json jsonb,
+  qr_ppwr_url text,
+  qr_dpp_url text,
+  pdf_url text,
+  finalized_at timestamp with time zone,
+  created_at timestamp with time zone default now()
+);
+
+create table if not exists epr_quarterly_exports (
+  id text primary key,
+  period_start date not null,
+  period_end date not null,
+  totals_json jsonb not null,
+  xlsx_url text,
+  pdf_url text,
+  created_at timestamp with time zone default now()
+);
+
+create table if not exists shops (
+  id text primary key,
+  name text,
+  public_api_key text unique,
+  created_at timestamp with time zone default now()
+);

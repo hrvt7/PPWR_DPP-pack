@@ -1,12 +1,23 @@
 import { nanoid } from "nanoid";
 import { parse } from "csv-parse/sync";
 import { getSupabaseServerClient } from "../../lib/supabase";
-import type { ComplianceReport, PackagingBox, Product } from "./types";
-import { buildPPWRDecision } from "./ppwrEngine";
-import { buildQrPayload, generateQrPng, generateQrSvg } from "./qrService";
+import type {
+  ComplianceReportRecord,
+  PackagingBox,
+  Product,
+  PackagingMaterialType
+} from "./types";
+import { recommendStandardBox } from "./boxRecommendation";
+import {
+  buildDppQrPayload,
+  buildQrPayload,
+  generateQrPng,
+  generateQrSvg
+} from "./qrService";
 import { generatePPWRLegalPdf } from "./ppwrLegalPdf";
 import { calculateCarbonFootprint } from "../../lib/carbon-calculator";
 import { decideReportEligibility } from "./reportEligibility";
+import { decidePPWRCompliance } from "./ppwrDecision";
 
 export class ComplianceError extends Error {
   status: number;
@@ -26,21 +37,53 @@ function getSupabaseClient() {
 }
 
 function mapProduct(row: any): Product {
+  const weightKg =
+    row.weight_kg === null || row.weight_kg === undefined
+      ? null
+      : Number(row.weight_kg);
+  const weightG =
+    row.weight_g === null || row.weight_g === undefined
+      ? null
+      : Number(row.weight_g);
   return {
     id: row.id,
+    merchant_id: row.merchant_id ?? null,
     external_id: row.external_id ?? undefined,
+    sku: row.sku ?? row.external_id ?? undefined,
     source: row.source,
     title: row.title,
     description: row.description ?? undefined,
+    product_url: row.product_url ?? null,
+    image_url: row.image_url ?? null,
     length_cm: row.length_cm === null ? null : Number(row.length_cm),
     width_cm: row.width_cm === null ? null : Number(row.width_cm),
     height_cm: row.height_cm === null ? null : Number(row.height_cm),
-    weight_kg: row.weight_kg === null ? null : Number(row.weight_kg),
+    weight_g: weightG ?? (weightKg !== null ? Math.round(weightKg * 1000) : null),
+    weight_kg: weightKg,
+    packaging_material_type: row.packaging_material_type ?? null,
     packaging_status: row.packaging_status ?? undefined,
     confirmed_at: row.confirmed_at ? new Date(row.confirmed_at) : undefined,
     confirmed_by: row.confirmed_by ?? undefined,
+    updated_at: row.updated_at ? new Date(row.updated_at) : undefined,
     created_at: new Date(row.created_at)
   };
+}
+
+function normalizePackagingMaterialType(
+  value?: string | null
+): PackagingMaterialType | null {
+  if (!value) return null;
+  const normalized = value.trim().toLowerCase();
+  const allowed: PackagingMaterialType[] = [
+    "cardboard",
+    "virgin_plastic",
+    "recycled_plastic",
+    "paper",
+    "pla",
+    "glass"
+  ];
+  const match = allowed.find((item) => item === normalized);
+  return match ?? null;
 }
 
 function mapBox(row: any): PackagingBox {
@@ -53,24 +96,20 @@ function mapBox(row: any): PackagingBox {
   };
 }
 
-function mapReport(row: any): ComplianceReport {
+function mapReport(row: any): ComplianceReportRecord {
   return {
     id: row.id,
     product_id: row.product_id,
-    ppwr_compliant:
-      row.ppwr_compliant === null || row.ppwr_compliant === undefined
-        ? null
-        : row.ppwr_compliant,
-    empty_space_percent:
-      row.empty_space_percent === null || row.empty_space_percent === undefined
-        ? null
-        : Number(row.empty_space_percent),
-    recommended_box_id: row.recommended_box_id ?? null,
+    kind: row.kind,
     status: row.status,
-    pdf_url: row.pdf_url ?? undefined,
-    qr_payload: row.qr_payload ?? undefined,
-    created_at: new Date(row.created_at),
-    finalized_at: row.finalized_at ? new Date(row.finalized_at) : undefined
+    ppwr_result_json: row.ppwr_result_json ?? null,
+    dpp_json: row.dpp_json ?? null,
+    carbon_json: row.carbon_json ?? null,
+    qr_ppwr_url: row.qr_ppwr_url ?? null,
+    qr_dpp_url: row.qr_dpp_url ?? null,
+    pdf_url: row.pdf_url ?? null,
+    finalized_at: row.finalized_at ? new Date(row.finalized_at) : undefined,
+    created_at: new Date(row.created_at)
   };
 }
 
@@ -87,35 +126,70 @@ export async function getProductById(productId: string) {
   return data ? mapProduct(data) : null;
 }
 
+export async function getProductBySku(sku: string) {
+  const supabase = getSupabaseClient();
+  const { data, error } = await supabase
+    .from("products")
+    .select("*")
+    .or(`sku.eq.${sku},external_id.eq.${sku}`)
+    .maybeSingle();
+  if (error) {
+    throw new ComplianceError("Failed to fetch product by SKU", 500);
+  }
+  return data ? mapProduct(data) : null;
+}
+
 export async function listPackagingBoxes() {
   const supabase = getSupabaseClient();
-  const { data, error } = await supabase.from("packaging_boxes").select("*");
+  const { data, error } = await supabase.from("standard_boxes").select("*");
   if (error) {
+    throw new ComplianceError("Failed to fetch standard boxes", 500);
+  }
+  if (data && data.length) {
+    return (data ?? []).map(mapBox);
+  }
+  const legacy = await supabase.from("packaging_boxes").select("*");
+  if (legacy.error) {
     throw new ComplianceError("Failed to fetch packaging boxes", 500);
   }
-  return (data ?? []).map(mapBox);
+  return (legacy.data ?? []).map(mapBox);
 }
 
 export async function getPackagingBoxById(boxId: string) {
   const supabase = getSupabaseClient();
-  const { data, error } = await supabase
+  const standard = await supabase
+    .from("standard_boxes")
+    .select("*")
+    .eq("id", boxId)
+    .maybeSingle();
+  if (standard.error) {
+    throw new ComplianceError("Failed to fetch standard box", 500);
+  }
+  if (standard.data) return mapBox(standard.data);
+  const legacy = await supabase
     .from("packaging_boxes")
     .select("*")
     .eq("id", boxId)
     .maybeSingle();
-  if (error) {
+  if (legacy.error) {
     throw new ComplianceError("Failed to fetch packaging box", 500);
   }
-  return data ? mapBox(data) : null;
+  return legacy.data ? mapBox(legacy.data) : null;
 }
 
 export async function createProductManual(payload: {
+  merchant_id?: string | null;
   title: string;
   description?: string;
+  sku?: string;
+  product_url?: string | null;
+  image_url?: string | null;
   length_cm?: number | null;
   width_cm?: number | null;
   height_cm?: number | null;
+  weight_g?: number | null;
   weight_kg?: number | null;
+  packaging_material_type?: string | null;
   source?: "manual" | "csv" | "shopify";
   external_id?: string;
   packaging_status?: "confirmed" | "estimated" | "missing";
@@ -135,32 +209,53 @@ export async function createProductManual(payload: {
       400
     );
   }
+  const weightG =
+    payload.weight_g !== undefined && payload.weight_g !== null
+      ? payload.weight_g
+      : payload.weight_kg !== undefined && payload.weight_kg !== null
+        ? Math.round(payload.weight_kg * 1000)
+        : null;
   const product: Product = {
     id: nanoid(),
+    merchant_id: payload.merchant_id ?? null,
     external_id: payload.external_id,
+    sku: payload.sku ?? payload.external_id,
     source: payload.source ?? "manual",
     title: payload.title,
     description: payload.description,
+    product_url: payload.product_url ?? null,
+    image_url: payload.image_url ?? null,
     length_cm: payload.length_cm ?? null,
     width_cm: payload.width_cm ?? null,
     height_cm: payload.height_cm ?? null,
+    weight_g: weightG,
     weight_kg: payload.weight_kg ?? null,
+    packaging_material_type: normalizePackagingMaterialType(
+      payload.packaging_material_type
+    ),
     packaging_status: packagingStatus,
     created_at: new Date()
   };
 
   const { error } = await supabase.from("products").insert({
     id: product.id,
+    merchant_id: product.merchant_id ?? null,
     external_id: product.external_id ?? null,
+    sku: product.sku ?? product.external_id ?? null,
     source: product.source,
     title: product.title,
     description: product.description ?? null,
+    product_url: product.product_url ?? null,
+    image_url: product.image_url ?? null,
     length_cm: product.length_cm,
     width_cm: product.width_cm,
     height_cm: product.height_cm,
+    weight_g: product.weight_g ?? null,
     weight_kg: product.weight_kg ?? null,
+    packaging_material_type: product.packaging_material_type ?? null,
     packaging_status: product.packaging_status ?? "missing",
-    created_at: product.created_at.toISOString()
+    created_at: product.created_at.toISOString(),
+    updated_at: product.created_at.toISOString()
   });
 
   if (error) {
@@ -232,6 +327,7 @@ export async function importProductsFromCSV(csv: string) {
       product: {
         id: nanoid(),
         external_id: sku,
+        sku,
         source: "shopify" as const,
         title,
         description:
@@ -239,6 +335,7 @@ export async function importProductsFromCSV(csv: string) {
         length_cm: null,
         width_cm: null,
         height_cm: null,
+        weight_g: weight === null ? null : Math.round(weight),
         weight_kg: weight === null ? null : Number((weight / 1000).toFixed(4)),
         packaging_status: "missing" as const,
         created_at: new Date()
@@ -281,6 +378,7 @@ export async function importProductsFromCSV(csv: string) {
     const width = parseNumber(row.width_cm);
     const height = parseNumber(row.height_cm);
     const weightKg = parseNumber(row.weight_kg);
+    const weightG = parseNumber(row.weight_g) ?? (weightKg !== null ? Math.round(weightKg * 1000) : null);
     const hasDimensions = length !== null && width !== null && height !== null;
     if (!hasDimensions) {
       addWarning(
@@ -292,12 +390,14 @@ export async function importProductsFromCSV(csv: string) {
     products.push({
       id: nanoid(),
       external_id: sku,
+      sku,
       source: "csv" as const,
       title,
       description: row.description || undefined,
       length_cm: length,
       width_cm: width,
       height_cm: height,
+      weight_g: weightG,
       weight_kg: weightKg,
       packaging_status: hasDimensions ? "confirmed" : "missing",
       created_at: new Date()
@@ -315,12 +415,17 @@ export async function importProductsFromCSV(csv: string) {
       source: product.source,
       title: product.title,
       description: product.description ?? null,
+      product_url: product.product_url ?? null,
+      image_url: product.image_url ?? null,
       length_cm: product.length_cm,
       width_cm: product.width_cm,
       height_cm: product.height_cm,
+      weight_g: product.weight_g ?? null,
       weight_kg: product.weight_kg ?? null,
+      packaging_material_type: product.packaging_material_type ?? null,
       packaging_status: product.packaging_status ?? "missing",
-      created_at: product.created_at.toISOString()
+      created_at: product.created_at.toISOString(),
+      updated_at: product.created_at.toISOString()
     }))
   );
 
@@ -334,7 +439,7 @@ export async function importProductsFromCSV(csv: string) {
 export async function getReportById(reportId: string) {
   const supabase = getSupabaseClient();
   const { data, error } = await supabase
-    .from("compliance_reports")
+    .from("reports")
     .select("*")
     .eq("id", reportId)
     .maybeSingle();
@@ -344,62 +449,51 @@ export async function getReportById(reportId: string) {
   return data ? mapReport(data) : null;
 }
 
-export async function generateDraftReport(productId: string) {
-  const product = await getProductById(productId);
+export async function generateDraftReport(params: {
+  productId: string;
+  buffer_percent?: number;
+  distance_km?: number | null;
+  destination_country?: string | null;
+}) {
+  const product = await getProductById(params.productId);
   if (!product) {
     throw new ComplianceError("Product not found", 404);
   }
 
-  if (
-    product.packaging_status !== "missing" &&
-    (product.length_cm === null ||
-      product.width_cm === null ||
-      product.height_cm === null)
-  ) {
-    throw new ComplianceError("Product dimensions missing", 400);
-  }
-
-  const report: ComplianceReport = {
+  const report: ComplianceReportRecord = {
     id: nanoid(),
     product_id: product.id,
-    ppwr_compliant: null,
-    empty_space_percent: null,
-    recommended_box_id: null,
+    kind: "combined",
     status: "draft",
+    ppwr_result_json: null,
+    dpp_json: null,
+    carbon_json: null,
     created_at: new Date()
   };
 
-  if (product.packaging_status !== "missing") {
-    const boxes = await listPackagingBoxes();
-    if (!boxes.length) {
-      throw new ComplianceError("No packaging boxes available", 400);
-    }
-    const bufferPercent = Number(process.env.PPWR_BUFFER_PERCENT ?? 0.12);
-    const decision = buildPPWRDecision({
-      product: product as Product,
-      boxes,
-      packaging_status: product.packaging_status,
-      buffer_percent: Number.isFinite(bufferPercent) ? bufferPercent : 0.12
-    });
-    report.empty_space_percent = Number(
-      decision.void_space_percentage.toFixed(2)
-    );
-    report.recommended_box_id = decision.recommended_box.id ?? null;
-    if (decision.compliance_status === "unknown") {
-      report.ppwr_compliant = null;
-    } else {
-      report.ppwr_compliant = decision.compliance_status === "pass";
-    }
-  }
+  const bufferPercent = Number.isFinite(params.buffer_percent)
+    ? Number(params.buffer_percent)
+    : Number(process.env.PPWR_BUFFER_PERCENT ?? 0.12);
+  const ppwrResult = await buildPpwrResult({
+    product,
+    buffer_percent: Number.isFinite(bufferPercent) ? bufferPercent : 0.12
+  });
+  const dppJson = buildDppJson(product, params.destination_country ?? null);
+  const carbonJson = buildCarbonJson(product, params.distance_km ?? null);
+
+  report.ppwr_result_json = ppwrResult;
+  report.dpp_json = dppJson;
+  report.carbon_json = carbonJson;
 
   const supabase = getSupabaseClient();
-  const { error } = await supabase.from("compliance_reports").insert({
+  const { error } = await supabase.from("reports").insert({
     id: report.id,
     product_id: report.product_id,
-    ppwr_compliant: report.ppwr_compliant,
-    empty_space_percent: report.empty_space_percent,
-    recommended_box_id: report.recommended_box_id,
+    kind: report.kind,
     status: report.status,
+    ppwr_result_json: report.ppwr_result_json,
+    dpp_json: report.dpp_json,
+    carbon_json: report.carbon_json,
     created_at: report.created_at.toISOString()
   });
 
@@ -416,8 +510,12 @@ export async function finalizeReport(reportId: string) {
   if (!report) {
     throw new ComplianceError("Report not found", 404);
   }
-  if (report.status === "finalized") {
-    return { pdf_url: report.pdf_url ?? "" };
+  if (report.status === "final") {
+    return {
+      pdf_url: report.pdf_url ?? "",
+      qr_ppwr_url: report.qr_ppwr_url ?? "",
+      qr_dpp_url: report.qr_dpp_url ?? ""
+    };
   }
 
   const product = await getProductById(report.product_id);
@@ -430,20 +528,16 @@ export async function finalizeReport(reportId: string) {
       400
     );
   }
-  if (
-    report.empty_space_percent === null ||
-    report.ppwr_compliant === null ||
-    report.recommended_box_id === null
-  ) {
+  const bufferPercent = Number(process.env.PPWR_BUFFER_PERCENT ?? 0.12);
+  const ppwrResult = await buildPpwrResult({
+    product,
+    buffer_percent: Number.isFinite(bufferPercent) ? bufferPercent : 0.12
+  });
+  if (!ppwrResult.recommended_box) {
     throw new ComplianceError(
-      "Draft report missing compliance data; regenerate draft report.",
+      "No recommended box available for finalization.",
       400
     );
-  }
-
-  const box = await getPackagingBoxById(report.recommended_box_id);
-  if (!box) {
-    throw new ComplianceError("Packaging box not found", 500);
   }
 
   const domain = process.env.APP_DOMAIN;
@@ -457,12 +551,28 @@ export async function finalizeReport(reportId: string) {
   const qrSvg = await generateQrSvg(qrPayload);
   const qrPng = await generateQrPng(qrPayload);
 
+  const destinationCountry =
+    (report.dpp_json as { destination_country?: string | null } | null)
+      ?.destination_country ?? null;
+  const dppRecord = await createDppRecord({
+    product,
+    reportId: report.id,
+    destinationCountry,
+    distanceKm: null
+  });
+  const dppPayload = buildDppQrPayload(dppRecord.id, domain, secret);
+  const dppSvg = await generateQrSvg(dppPayload);
+  const dppPng = await generateQrPng(dppPayload);
+
   const verificationUrl = qrPayload;
-  const decision = buildPPWRDecision({
-    product: product as Product,
-    boxes: [box],
-    packaging_status: product.packaging_status,
-    buffer_percent: Number(process.env.PPWR_BUFFER_PERCENT ?? 0.12)
+  const dppJson = {
+    ...buildDppJson(product, destinationCountry),
+    dpp_id: dppRecord.id
+  };
+  const carbonJson = buildCarbonJson(product, null);
+  const decision = decidePPWRCompliance({
+    packaging_status: product.packaging_status ?? "missing",
+    void_space_percentage: ppwrResult.void_space_percentage ?? 0
   });
   const eligibility = decideReportEligibility({
     compliance_status: decision.compliance_status,
@@ -473,10 +583,10 @@ export async function finalizeReport(reportId: string) {
     product,
     boxRecommendation: {
       status: "final",
-      message: decision.reasons.join(" "),
-      buffer_percent: decision.buffer_percent,
-      void_space_percentage: decision.void_space_percentage,
-      recommended_box: box
+      message: ppwrResult.reasons.join(" "),
+      buffer_percent: ppwrResult.buffer_percent,
+      void_space_percentage: ppwrResult.void_space_percentage ?? undefined,
+      recommended_box: ppwrResult.recommended_box
     },
     decision: {
       compliance_status: decision.compliance_status,
@@ -484,16 +594,20 @@ export async function finalizeReport(reportId: string) {
       reasons: decision.reasons
     },
     eligibility,
-    verificationUrl
+    verificationUrl,
+    dppUrl: dppPayload,
+    carbonSummary: carbonJson
   });
 
   const pdfPath = `reports/${report.id}.pdf`;
-  const svgPath = `qr/${report.id}.svg`;
-  const pngPath = `qr/${report.id}.png`;
+  const ppwrSvgPath = `qr/ppwr/${report.id}.svg`;
+  const ppwrPngPath = `qr/ppwr/${report.id}.png`;
+  const dppSvgPath = `qr/dpp/${dppRecord.id}.svg`;
+  const dppPngPath = `qr/dpp/${dppRecord.id}.png`;
 
   const { error: svgError } = await supabase.storage
     .from(bucket)
-    .upload(svgPath, Buffer.from(qrSvg), {
+    .upload(ppwrSvgPath, Buffer.from(qrSvg), {
       contentType: "image/svg+xml",
       upsert: true
     });
@@ -503,12 +617,32 @@ export async function finalizeReport(reportId: string) {
 
   const { error: pngError } = await supabase.storage
     .from(bucket)
-    .upload(pngPath, qrPng, {
+    .upload(ppwrPngPath, qrPng, {
       contentType: "image/png",
       upsert: true
     });
   if (pngError) {
     throw new ComplianceError("Failed to upload QR PNG", 500);
+  }
+
+  const { error: dppSvgError } = await supabase.storage
+    .from(bucket)
+    .upload(dppSvgPath, Buffer.from(dppSvg), {
+      contentType: "image/svg+xml",
+      upsert: true
+    });
+  if (dppSvgError) {
+    throw new ComplianceError("Failed to upload DPP QR SVG", 500);
+  }
+
+  const { error: dppPngError } = await supabase.storage
+    .from(bucket)
+    .upload(dppPngPath, dppPng, {
+      contentType: "image/png",
+      upsert: true
+    });
+  if (dppPngError) {
+    throw new ComplianceError("Failed to upload DPP QR PNG", 500);
   }
 
   const { error: pdfError } = await supabase.storage
@@ -521,15 +655,27 @@ export async function finalizeReport(reportId: string) {
     throw new ComplianceError("Failed to upload PDF", 500);
   }
 
-  const { data: publicUrl } = supabase.storage.from(bucket).getPublicUrl(pdfPath);
+  const { data: publicPdfUrl } = supabase.storage
+    .from(bucket)
+    .getPublicUrl(pdfPath);
+  const { data: publicPpwrQrUrl } = supabase.storage
+    .from(bucket)
+    .getPublicUrl(ppwrPngPath);
+  const { data: publicDppQrUrl } = supabase.storage
+    .from(bucket)
+    .getPublicUrl(dppPngPath);
 
   const finalizedAt = new Date().toISOString();
   const { error: updateError } = await supabase
-    .from("compliance_reports")
+    .from("reports")
     .update({
-      status: "finalized",
-      pdf_url: publicUrl.publicUrl,
-      qr_payload: qrPayload,
+      status: "final",
+      pdf_url: publicPdfUrl.publicUrl,
+      qr_ppwr_url: publicPpwrQrUrl.publicUrl,
+      qr_dpp_url: publicDppQrUrl.publicUrl,
+      ppwr_result_json: ppwrResult,
+      dpp_json: dppJson,
+      carbon_json: carbonJson,
       finalized_at: finalizedAt
     })
     .eq("id", report.id);
@@ -538,39 +684,148 @@ export async function finalizeReport(reportId: string) {
     throw new ComplianceError("Failed to finalize report", 500);
   }
 
-  await createDppRecord({
+  return {
+    pdf_url: publicPdfUrl.publicUrl,
+    qr_ppwr_url: publicPpwrQrUrl.publicUrl,
+    qr_dpp_url: publicDppQrUrl.publicUrl,
+    dpp_id: dppRecord.id
+  };
+}
+
+function buildDppJson(product: Product, destinationCountry: string | null) {
+  return {
+    product_id: product.id,
+    sku: product.sku ?? product.external_id ?? null,
+    title: product.title,
+    description: product.description ?? null,
+    dimensions_cm: {
+      length: product.length_cm,
+      width: product.width_cm,
+      height: product.height_cm
+    },
+    destination_country: destinationCountry
+  };
+}
+
+function buildCarbonJson(product: Product, distanceKm: number | null) {
+  if (!product.weight_g && !product.weight_kg) {
+    return null;
+  }
+  const weightG =
+    product.weight_g ??
+    (product.weight_kg != null ? Math.round(product.weight_kg * 1000) : 0);
+  const material = product.packaging_material_type ?? "cardboard";
+  return calculateCarbonFootprint(weightG, material, distanceKm ?? undefined);
+}
+
+async function buildPpwrResult(params: {
+  product: Product;
+  buffer_percent: number;
+}) {
+  const { product, buffer_percent } = params;
+  if (product.packaging_status === "missing") {
+    return {
+      compliance_status: "unknown",
+      reasons: [
+        "Packaging dimensions missing",
+        "Add product dimensions and confirm packaging"
+      ],
+      buffer_percent,
+      recommended_box: null,
+      void_space_percentage: null,
+      product_volume_cm3: null,
+      chosen_box_volume_cm3: null
+    };
+  }
+
+  const boxes = await listPackagingBoxes();
+  if (!boxes.length) {
+    return {
+      compliance_status: "unknown",
+      reasons: ["No standard boxes available"],
+      buffer_percent,
+      recommended_box: null,
+      void_space_percentage: null,
+      product_volume_cm3: null,
+      chosen_box_volume_cm3: null
+    };
+  }
+
+  const recommendation = recommendStandardBox({
     product,
-    reportId: report.id,
-    destinationCountry: null
+    boxes,
+    packaging_status: product.packaging_status ?? "missing",
+    buffer_percent
   });
 
-  return { pdf_url: publicUrl.publicUrl };
+  if (recommendation.status === "error" || !recommendation.recommended_box) {
+    return {
+      compliance_status: "unknown",
+      reasons: [recommendation.message],
+      buffer_percent,
+      recommended_box: null,
+      void_space_percentage: null,
+      product_volume_cm3: recommendation.product_volume_cm3 ?? null,
+      chosen_box_volume_cm3: null
+    };
+  }
+
+  const productVolume = recommendation.product_volume_cm3 ?? null;
+  const boxVolume =
+    recommendation.recommended_box.length_cm *
+    recommendation.recommended_box.width_cm *
+    recommendation.recommended_box.height_cm;
+  const voidSpace =
+    recommendation.void_space_percentage ?? null;
+
+  const decision = decidePPWRCompliance({
+    packaging_status: product.packaging_status ?? "missing",
+    void_space_percentage: voidSpace ?? 0
+  });
+
+  return {
+    compliance_status: decision.compliance_status,
+    reasons: decision.reasons,
+    buffer_percent,
+    recommended_box: recommendation.recommended_box,
+    void_space_percentage: voidSpace,
+    product_volume_cm3: productVolume,
+    chosen_box_volume_cm3: Number(boxVolume.toFixed(2))
+  };
 }
 
 async function createDppRecord(params: {
   product: Product;
   reportId: string;
   destinationCountry: string | null;
+  distanceKm: number | null;
 }) {
   const supabase = getSupabaseClient();
-  const weightInGrams = 0;
-  const materialType = "corrugated_cardboard";
-  const carbon = calculateCarbonFootprint(weightInGrams, materialType);
+  const weightG =
+    params.product.weight_g ??
+    (params.product.weight_kg != null
+      ? Math.round(params.product.weight_kg * 1000)
+      : 0);
+  const materialType = params.product.packaging_material_type ?? "cardboard";
+  const carbon = calculateCarbonFootprint(weightG, materialType, params.distanceKm ?? undefined);
+  const id = nanoid();
 
   const { error } = await supabase.from("dpp").insert({
-    id: nanoid(),
+    id,
     product_id: params.product.id,
     report_id: params.reportId,
     destination_country: params.destinationCountry,
-    carbon_material_co2: carbon.carbonMaterialCo2,
-    carbon_transport_co2: carbon.carbonTransportCo2,
-    carbon_total_co2: carbon.carbonTotalCo2,
-    carbon_calculation_date: carbon.carbonCalculationDate.toISOString(),
-    carbon_calculation_method: carbon.carbonCalculationMethod,
+    carbon_material_co2: carbon.material_kg_co2e,
+    carbon_transport_co2: carbon.transport_kg_co2e,
+    carbon_total_co2: carbon.total_kg_co2e,
+    carbon_calculation_date: new Date().toISOString(),
+    carbon_calculation_method: carbon.methodology_id,
     created_at: new Date().toISOString()
   });
 
   if (error) {
     throw new ComplianceError("Failed to create DPP record", 500);
   }
+
+  return { id, carbon };
 }

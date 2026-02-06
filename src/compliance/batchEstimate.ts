@@ -73,25 +73,15 @@ export async function estimateMissingDimensionsBatch(
     }
     products = data ?? [];
   } else if (storeId) {
-    const baseQuery = supabase
+    const baseQuery = await supabase
       .from("products")
       .select("id, title, description, packaging_status")
+      .eq("merchant_id", storeId)
       .limit(limit);
-
-    const primary = await baseQuery.eq("store_id", storeId);
-    if (primary.error) {
-      const fallback = await supabase
-        .from("products")
-        .select("id, title, description, packaging_status")
-        .eq("company_id", storeId)
-        .limit(limit);
-      if (fallback.error) {
-        throw new Error("Failed to load products for estimation");
-      }
-      products = fallback.data ?? [];
-    } else {
-      products = primary.data ?? [];
+    if (baseQuery.error) {
+      throw new Error("Failed to load products for estimation");
     }
+    products = baseQuery.data ?? [];
   }
 
   const foundIds = new Set(products.map((product) => product.id));
@@ -136,30 +126,16 @@ export async function estimateMissingDimensionsBatch(
           product_description: product.description ?? ""
         });
 
-        const updatePayload = {
-          length_cm: estimate.estimated_length_cm,
-          width_cm: estimate.estimated_width_cm,
-          height_cm: estimate.estimated_height_cm,
-          estimation_confidence: estimate.confidence,
-          packaging_status: "estimated"
-        };
-
-        let updateResult = await supabase
+        const updateResult = await supabase
           .from("products")
-          .update(updatePayload)
+          .update({
+            length_cm: estimate.estimated_length_cm,
+            width_cm: estimate.estimated_width_cm,
+            height_cm: estimate.estimated_height_cm,
+            packaging_status: "estimated",
+            updated_at: new Date().toISOString()
+          })
           .eq("id", product.id);
-
-        if (updateResult.error) {
-          updateResult = await supabase
-            .from("products")
-            .update({
-              length_cm: estimate.estimated_length_cm,
-              width_cm: estimate.estimated_width_cm,
-              height_cm: estimate.estimated_height_cm,
-              packaging_status: "estimated"
-            })
-            .eq("id", product.id);
-        }
 
         if (updateResult.error) {
           throw new Error(`Failed to update product ${product.id}`);

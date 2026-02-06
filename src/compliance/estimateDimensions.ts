@@ -25,7 +25,13 @@ export async function estimateProductDimensions(
 ): Promise<EstimateResult> {
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) {
-    throw new Error("Missing OPENAI_API_KEY");
+    return {
+      estimated_length_cm: 10,
+      estimated_width_cm: 10,
+      estimated_height_cm: 10,
+      confidence: 0.2,
+      reason: "Fallback estimate used because AI key is missing."
+    };
   }
 
   const client = new OpenAI({ apiKey });
@@ -56,15 +62,37 @@ export async function estimateProductDimensions(
 
   const raw = response.choices[0]?.message?.content;
   if (!raw) {
-    throw new Error("No response from OpenAI");
+    return {
+      estimated_length_cm: 10,
+      estimated_width_cm: 10,
+      estimated_height_cm: 10,
+      confidence: 0.2,
+      reason: "Fallback estimate used due to empty AI response."
+    };
   }
 
   let parsed: unknown;
   try {
     parsed = JSON.parse(raw);
   } catch {
-    throw new Error("Invalid JSON response from OpenAI");
+    return {
+      estimated_length_cm: 10,
+      estimated_width_cm: 10,
+      estimated_height_cm: 10,
+      confidence: 0.2,
+      reason: "Fallback estimate used due to invalid AI JSON."
+    };
   }
 
-  return responseSchema.parse(parsed);
+  try {
+    return responseSchema.parse(parsed);
+  } catch {
+    return {
+      estimated_length_cm: 10,
+      estimated_width_cm: 10,
+      estimated_height_cm: 10,
+      confidence: 0.2,
+      reason: "Fallback estimate used due to invalid AI payload."
+    };
+  }
 }

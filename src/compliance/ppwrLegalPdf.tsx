@@ -12,6 +12,7 @@ import type { Product } from "./types";
 import type { BoxRecommendation } from "./boxRecommendation";
 import type { PPWRDecision } from "./ppwrDecision";
 import type { ReportEligibility } from "./reportEligibility";
+import type { CarbonFootprintResult } from "../../lib/carbon-calculator";
 import { generateQrPng } from "./qrService";
 
 const styles = StyleSheet.create({
@@ -98,9 +99,18 @@ export async function generatePPWRLegalPdf(params: {
   decision: PPWRDecision;
   eligibility: ReportEligibility;
   verificationUrl: string;
+  dppUrl?: string;
+  carbonSummary?: CarbonFootprintResult | null;
 }) {
-  const { product, boxRecommendation, decision, eligibility, verificationUrl } =
-    params;
+  const {
+    product,
+    boxRecommendation,
+    decision,
+    eligibility,
+    verificationUrl,
+    dppUrl,
+    carbonSummary
+  } = params;
 
   if (eligibility.state === "blocked") {
     throw new Error("Report is blocked and cannot be generated.");
@@ -108,6 +118,10 @@ export async function generatePPWRLegalPdf(params: {
 
   const qrPng = await generateQrPng(verificationUrl);
   const qrDataUrl = `data:image/png;base64,${qrPng.toString("base64")}`;
+  const dppQrPng = dppUrl ? await generateQrPng(dppUrl) : null;
+  const dppQrDataUrl = dppQrPng
+    ? `data:image/png;base64,${dppQrPng.toString("base64")}`
+    : null;
   const watermarkText =
     eligibility.state === "review" ? "DRAFT – NOT FINAL" : undefined;
 
@@ -166,9 +180,21 @@ export async function generatePPWRLegalPdf(params: {
             {decision.compliance_status.toUpperCase()}
           </Text>
         </View>
+        <View style={styles.section}>
+          <Text style={styles.label}>Carbon Footprint (LIGHT)</Text>
+          <Text style={styles.value}>
+            Total: {carbonSummary?.total_kg_co2e ?? 0} {carbonSummary?.unit ?? "kg_co2e"}
+          </Text>
+          <Text style={styles.value}>
+            Material: {carbonSummary?.material_kg_co2e ?? 0} {carbonSummary?.unit ?? "kg_co2e"}
+          </Text>
+          <Text style={styles.value}>
+            Transport: {carbonSummary?.transport_kg_co2e ?? 0} {carbonSummary?.unit ?? "kg_co2e"}
+          </Text>
+        </View>
         <Text style={styles.footer}>
           This report is generated from merchant-provided data and is not legal
-          advice. Carbon footprint uses a light estimate method.
+          advice. {carbonSummary?.disclaimer_text ?? "Carbon uses a light estimate method."}
         </Text>
       </Page>
 
@@ -179,6 +205,12 @@ export async function generatePPWRLegalPdf(params: {
         <Text style={styles.title}>Verification &amp; Legal</Text>
         <Image style={styles.qr} src={qrDataUrl} />
         <Text style={styles.value}>Scan to verify this report</Text>
+        {dppQrDataUrl ? (
+          <>
+            <Image style={styles.qr} src={dppQrDataUrl} />
+            <Text style={styles.value}>Scan to view the Digital Product Passport</Text>
+          </>
+        ) : null}
         <View style={styles.section}>
           <Text style={styles.label}>Legal disclaimer</Text>
           <Text style={styles.value}>

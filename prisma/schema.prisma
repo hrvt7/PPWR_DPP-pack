@@ -19,3 +19,10 @@ model DPP {
   carbonCalculationDate   DateTime?
   carbonCalculationMethod String? @default("EU_AVERAGE_LIGHT_V1")
 }
+
+model Shop {
+  id           String  @id @default(cuid())
+  name         String?
+  publicApiKey String? @unique
+  createdAt    DateTime @default(now())
+}

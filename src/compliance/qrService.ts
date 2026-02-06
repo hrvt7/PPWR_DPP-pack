@@ -12,6 +12,12 @@ export function buildQrPayload(reportId: string, domain: string, secret: string)
   return `${normalized}/verify/${reportId}?hash=${hash}`;
 }
 
+export function buildDppQrPayload(dppId: string, domain: string, secret: string) {
+  const normalized = domain.replace(/\/$/, "");
+  const hash = hashReportId(dppId, secret);
+  return `${normalized}/dpp/${dppId}?hash=${hash}`;
+}
+
 export async function generateQrSvg(payload: string) {
   return QRCode.toString(payload, { type: "svg", margin: 1 });
 }

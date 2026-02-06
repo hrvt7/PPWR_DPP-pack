@@ -6,18 +6,20 @@ export type PPWRDecision = {
   reasons: string[];
 };
 
+export const CAP_PERCENT = 40;
+
 export function decidePPWRCompliance(params: {
   packaging_status: PackagingStatus;
   void_space_percentage: number;
 }): PPWRDecision {
   const { packaging_status, void_space_percentage } = params;
 
-  if (void_space_percentage > 40) {
+  if (void_space_percentage > CAP_PERCENT) {
     return {
       compliance_status: "fail",
       void_space_percentage,
       reasons: [
-        "Void space exceeds 40% limit",
+        `Void space exceeds ${CAP_PERCENT}% limit`,
         "Use smaller box or adjust packaging"
       ]
     };
@@ -48,6 +50,6 @@ export function decidePPWRCompliance(params: {
   return {
     compliance_status: "pass",
     void_space_percentage,
-    reasons: ["Packaging compliant with PPWR Article 24"]
+    reasons: [`Packaging compliant with PPWR Article 24 (<= ${CAP_PERCENT}%)`]
   };
 }

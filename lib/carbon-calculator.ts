@@ -1,19 +1,25 @@
 export type CarbonFootprintResult = {
-  carbonMaterialCo2: number;
-  carbonTransportCo2: number;
-  carbonTotalCo2: number;
-  carbonCalculationDate: Date;
-  carbonCalculationMethod: "EU_AVERAGE_LIGHT_V1";
+  total_kg_co2e: number;
+  material_kg_co2e: number;
+  transport_kg_co2e: number;
+  unit: "kg_co2e";
+  methodology_id: "LIGHT-v1";
+  disclaimer_text: string;
 };
 
-const DEFAULT_DISTANCE_KM = 500;
-const DEFAULT_TRANSPORT_FACTOR = 0.000105;
+export const DEFAULT_DISTANCE_KM = 500;
+export const DEFAULT_TRANSPORT_FACTOR = 0.000105;
+export const CARBON_DISCLAIMER =
+  "This footprint is a light estimate based on merchant-provided data and default transport assumptions.";
 
 const MATERIAL_FACTORS: Record<string, number> = {
+  cardboard: 0.94,
   corrugated_cardboard: 0.94,
   virgin_plastic: 2.5,
   paper: 1.05,
-  recycled_plastic: 0.85
+  recycled_plastic: 0.85,
+  pla: 0.9,
+  glass: 0.85
 };
 
 function normalizeMaterial(materialType: string) {
@@ -25,16 +31,14 @@ export function calculateCarbonFootprint(
   materialType: string,
   customDistance?: number
 ): CarbonFootprintResult {
-  const method: CarbonFootprintResult["carbonCalculationMethod"] =
-    "EU_AVERAGE_LIGHT_V1";
-
   if (!Number.isFinite(weightInGrams) || weightInGrams <= 0) {
     return {
-      carbonMaterialCo2: 0,
-      carbonTransportCo2: 0,
-      carbonTotalCo2: 0,
-      carbonCalculationDate: new Date(),
-      carbonCalculationMethod: method
+      total_kg_co2e: 0,
+      material_kg_co2e: 0,
+      transport_kg_co2e: 0,
+      unit: "kg_co2e",
+      methodology_id: "LIGHT-v1",
+      disclaimer_text: CARBON_DISCLAIMER
     };
   }
 
@@ -48,23 +52,25 @@ export function calculateCarbonFootprint(
   const materialFactor = MATERIAL_FACTORS[normalized];
   if (!materialFactor) {
     return {
-      carbonMaterialCo2: 0,
-      carbonTransportCo2: 0,
-      carbonTotalCo2: 0,
-      carbonCalculationDate: new Date(),
-      carbonCalculationMethod: method
+      total_kg_co2e: 0,
+      material_kg_co2e: 0,
+      transport_kg_co2e: 0,
+      unit: "kg_co2e",
+      methodology_id: "LIGHT-v1",
+      disclaimer_text: CARBON_DISCLAIMER
     };
   }
 
-  const carbonMaterialCo2 = weightKg * materialFactor;
-  const carbonTransportCo2 = weightKg * distanceKm * DEFAULT_TRANSPORT_FACTOR;
-  const carbonTotalCo2 = carbonMaterialCo2 + carbonTransportCo2;
+  const material_kg_co2e = weightKg * materialFactor;
+  const transport_kg_co2e = weightKg * distanceKm * DEFAULT_TRANSPORT_FACTOR;
+  const total_kg_co2e = material_kg_co2e + transport_kg_co2e;
 
   return {
-    carbonMaterialCo2,
-    carbonTransportCo2,
-    carbonTotalCo2,
-    carbonCalculationDate: new Date(),
-    carbonCalculationMethod: method
+    total_kg_co2e,
+    material_kg_co2e,
+    transport_kg_co2e,
+    unit: "kg_co2e",
+    methodology_id: "LIGHT-v1",
+    disclaimer_text: CARBON_DISCLAIMER
   };
 }
