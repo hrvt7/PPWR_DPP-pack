@@ -6,7 +6,20 @@ function volume(length: number, width: number, height: number) {
   return length * width * height;
 }
 
-function fitsBox(product: Product, box: PackagingBox) {
+function hasDimensions(
+  product: Product
+): product is Product & { length_cm: number; width_cm: number; height_cm: number } {
+  return (
+    product.length_cm !== null &&
+    product.width_cm !== null &&
+    product.height_cm !== null
+  );
+}
+
+function fitsBox(
+  product: Product & { length_cm: number; width_cm: number; height_cm: number },
+  box: PackagingBox
+) {
   return (
     box.length_cm >= product.length_cm &&
     box.width_cm >= product.width_cm &&
@@ -23,14 +36,11 @@ export function calculatePPWRCompliance(params: {
     throw new Error("No packaging boxes available");
   }
 
-  if (
-    product.length_cm === null ||
-    product.width_cm === null ||
-    product.height_cm === null ||
-    product.length_cm <= 0 ||
-    product.width_cm <= 0 ||
-    product.height_cm <= 0
-  ) {
+  if (!hasDimensions(product)) {
+    throw new Error("Product dimensions missing or invalid");
+  }
+
+  if (product.length_cm <= 0 || product.width_cm <= 0 || product.height_cm <= 0) {
     throw new Error("Product dimensions missing or invalid");
   }
 
@@ -95,6 +105,7 @@ export function buildPPWRDecision(params: {
   packaging_status?: "confirmed" | "estimated" | "missing";
   buffer_percent?: number;
 }): PPWRDecisionResult {
+  const { product, boxes } = params;
   const recommendation = recommendStandardBox({
     product,
     boxes,

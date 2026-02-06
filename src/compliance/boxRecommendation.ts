@@ -16,7 +16,20 @@ function volume(length: number, width: number, height: number) {
   return length * width * height;
 }
 
-function fitsBox(product: Product, box: StandardBox) {
+function hasDimensions(
+  product: Product
+): product is Product & { length_cm: number; width_cm: number; height_cm: number } {
+  return (
+    product.length_cm !== null &&
+    product.width_cm !== null &&
+    product.height_cm !== null
+  );
+}
+
+function fitsBox(
+  product: Product & { length_cm: number; width_cm: number; height_cm: number },
+  box: StandardBox
+) {
   return (
     box.length_cm >= product.length_cm &&
     box.width_cm >= product.width_cm &&
@@ -34,11 +47,7 @@ export function recommendStandardBox(params: {
   const packagingStatus = params.packaging_status ?? product.packaging_status ?? "confirmed";
   const bufferPercent = params.buffer_percent ?? DEFAULT_BUFFER_PERCENT;
 
-  if (
-    product.length_cm === null ||
-    product.width_cm === null ||
-    product.height_cm === null
-  ) {
+  if (!hasDimensions(product)) {
     return {
       status: "error",
       message: "Product dimensions missing. Cannot recommend a packaging box.",

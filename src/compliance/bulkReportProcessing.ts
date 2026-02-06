@@ -50,15 +50,15 @@ export async function processBulkPPWRReports(
 
   for (const input of inputs) {
     const voidSpace = input.boxRecommendation.void_space_percentage;
-    if (!Number.isFinite(voidSpace)) {
-    const decision: PPWRDecision = {
-      compliance_status: "fail",
-      void_space_percentage: 0,
-      reasons: [
-        "Void space percentage missing",
-        "Compute box recommendation with void space percentage"
-      ]
-    };
+    if (voidSpace === null || voidSpace === undefined || !Number.isFinite(voidSpace)) {
+      const decision: PPWRDecision = {
+        compliance_status: "fail",
+        void_space_percentage: 0,
+        reasons: [
+          "Void space percentage missing",
+          "Compute box recommendation with void space percentage"
+        ]
+      };
       const eligibility = decideReportEligibility(decision);
       summary.fail += 1;
       summary.blocked += 1;

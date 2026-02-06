@@ -51,6 +51,7 @@ export async function POST(request: Request) {
     const box = report.recommended_box_id
       ? await getPackagingBoxById(report.recommended_box_id)
       : {
+          id: "pending",
           name: "Pending",
           length_cm: 0,
           width_cm: 0,

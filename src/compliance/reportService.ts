@@ -3,7 +3,6 @@ import { parse } from "csv-parse/sync";
 import { getSupabaseServerClient } from "../../lib/supabase";
 import type { ComplianceReport, PackagingBox, Product } from "./types";
 import { buildPPWRDecision } from "./ppwrEngine";
-import { buildDppSummary } from "./dppEngine";
 import { buildQrPayload, generateQrPng, generateQrSvg } from "./qrService";
 import { generatePPWRLegalPdf } from "./ppwrLegalPdf";
 import { calculateCarbonFootprint } from "../../lib/carbon-calculator";
@@ -194,18 +193,7 @@ export async function importProductsFromCSV(csv: string) {
     headers.includes("Title") || headers.includes("Variant SKU");
 
   const warnings: { sku: string; reason: string }[] = [];
-  const products: Array<{
-    id: string;
-    external_id: string;
-    source: "csv" | "shopify";
-    title: string;
-    description?: string;
-    length_cm: number | null;
-    width_cm: number | null;
-    height_cm: number | null;
-    packaging_status: "missing" | "confirmed";
-    created_at: Date;
-  }> = [];
+  const products: Product[] = [];
 
   const addWarning = (sku: string, reason: string) => {
     warnings.push({ sku, reason });
@@ -484,8 +472,7 @@ export async function finalizeReport(reportId: string) {
   const pdfBuffer = await generatePPWRLegalPdf({
     product,
     boxRecommendation: {
-      status:
-        product.packaging_status === "estimated" ? "warning" : "final",
+      status: "final",
       message: decision.reasons.join(" "),
       buffer_percent: decision.buffer_percent,
       void_space_percentage: decision.void_space_percentage,
