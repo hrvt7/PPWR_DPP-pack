@@ -11,6 +11,12 @@ const schema = z.object({
   name: z.string().min(1)
 });
 
+// Example:
+// curl -X POST http://localhost:3000/api/auth/create-shop \
+//   -H "Authorization: Bearer <SUPABASE_JWT>" \
+//   -H "Content-Type: application/json" \
+//   -d '{"name":"Acme Store"}'
+
 function getBearerToken(request: Request) {
   const header = request.headers.get("authorization") ?? "";
   const [, token] = header.split(" ");
@@ -28,12 +34,12 @@ export async function POST(request: Request) {
 
   const token = getBearerToken(request);
   if (!token) {
-    return NextResponse.json({ error: "Missing auth token" }, { status: 401 });
+    return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
   }
 
   const { data: userData, error: userError } = await supabase.auth.getUser(token);
   if (userError || !userData?.user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
   }
 
   try {
@@ -52,21 +58,25 @@ export async function POST(request: Request) {
 
     if (error) {
       return NextResponse.json(
-        { error: "Failed to create shop" },
+        { message: "Failed to create shop" },
         { status: 500 }
       );
     }
 
     return NextResponse.json({
-      shop_id: shopId,
+      shop: {
+        id: shopId,
+        name: payload.name,
+        api_key: apiKey
+      },
       api_key: apiKey
     });
   } catch (error) {
     if (error instanceof z.ZodError) {
-      return NextResponse.json({ error: "Invalid request" }, { status: 400 });
+      return NextResponse.json({ message: "Name is required" }, { status: 400 });
     }
     return NextResponse.json(
-      { error: "Failed to create shop" },
+      { message: "Failed to create shop" },
       { status: 500 }
     );
   }
