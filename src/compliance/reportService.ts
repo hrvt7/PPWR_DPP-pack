@@ -355,7 +355,8 @@ export async function importProductsFromCSV(csv: string) {
 
   const pickTitle = (row: Record<string, string>) =>
     pick(row, ["name", "Name", "item_name", "Item Name", "product_name"]);
-  const pickSku = (row: Record<string, string>) => pick(row, ["sku", "SKU"]);
+  const pickSku = (row: Record<string, string>) =>
+    pick(row, ["sku", "SKU", "Variant SKU", "external_id", "Listing ID"]);
 
   let rejected = 0;
 
@@ -386,10 +387,24 @@ export async function importProductsFromCSV(csv: string) {
     const height = parseNumber(
       pick(row, ["height_cm", "Height", "Height (cm)"])
     );
-    const weightG = parseNumber(
+    const weightGFromGram = parseNumber(
       pick(row, ["weight_g", "weight", "Weight", "net_weight_g", "Net Weight (g)"])
     );
-    const weightKg = weightG !== null ? Number((weightG / 1000).toFixed(4)) : null;
+    const weightKgFromKg = parseNumber(
+      pick(row, ["weight_kg", "Weight (kg)", "net_weight_kg"])
+    );
+    const weightG =
+      weightGFromGram !== null
+        ? weightGFromGram
+        : weightKgFromKg !== null
+          ? Math.round(weightKgFromKg * 1000)
+          : null;
+    const weightKg =
+      weightKgFromKg !== null
+        ? Number(weightKgFromKg.toFixed(4))
+        : weightG !== null
+          ? Number((weightG / 1000).toFixed(4))
+          : null;
     const hasDimensions = length !== null && width !== null && height !== null;
     if (!hasDimensions) {
       addWarning(
