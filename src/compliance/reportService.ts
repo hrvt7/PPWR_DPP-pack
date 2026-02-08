@@ -294,6 +294,16 @@ export async function importProductsFromCSV(csv: string) {
     warnings.push({ sku, reason });
   };
 
+  const pick = (row: Record<string, string>, keys: string[]) => {
+    for (const key of keys) {
+      const value = row[key];
+      if (value !== undefined && value !== null && String(value).trim() !== "") {
+        return String(value).trim();
+      }
+    }
+    return "";
+  };
+
   const parseNumber = (value?: string) => {
     if (!value) return null;
     const parsed = Number(String(value).trim());
@@ -344,15 +354,8 @@ export async function importProductsFromCSV(csv: string) {
   };
 
   const pickTitle = (row: Record<string, string>) =>
-    (row.name || row.title || row.product_name || row.product_title || "").trim();
-  const pickSku = (row: Record<string, string>) =>
-    (
-      row.sku ||
-      row.SKU ||
-      row["Variant SKU"] ||
-      row.external_id ||
-      ""
-    ).trim();
+    pick(row, ["name", "Name", "item_name", "Item Name", "product_name"]);
+  const pickSku = (row: Record<string, string>) => pick(row, ["sku", "SKU"]);
 
   let rejected = 0;
 
@@ -374,11 +377,19 @@ export async function importProductsFromCSV(csv: string) {
       continue;
     }
 
-    const length = parseNumber(row.length_cm);
-    const width = parseNumber(row.width_cm);
-    const height = parseNumber(row.height_cm);
-    const weightKg = parseNumber(row.weight_kg);
-    const weightG = parseNumber(row.weight_g) ?? (weightKg !== null ? Math.round(weightKg * 1000) : null);
+    const length = parseNumber(
+      pick(row, ["length_cm", "Length", "Length (cm)"])
+    );
+    const width = parseNumber(
+      pick(row, ["width_cm", "Width", "Width (cm)"])
+    );
+    const height = parseNumber(
+      pick(row, ["height_cm", "Height", "Height (cm)"])
+    );
+    const weightG = parseNumber(
+      pick(row, ["weight_g", "weight", "Weight", "net_weight_g", "Net Weight (g)"])
+    );
+    const weightKg = weightG !== null ? Number((weightG / 1000).toFixed(4)) : null;
     const hasDimensions = length !== null && width !== null && height !== null;
     if (!hasDimensions) {
       addWarning(
