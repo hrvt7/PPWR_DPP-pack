@@ -4,7 +4,10 @@ import {
   ComplianceError,
   importProductsFromCSV
 } from "../../../../../src/compliance/reportService";
-import { ApiKeyError, requireApiKey } from "../../../../../src/auth/requireApiKey";
+import {
+  requireSupabaseUser,
+  SupabaseAuthError
+} from "../../../../../src/auth/requireSupabaseUser";
 
 export const runtime = "nodejs";
 
@@ -14,17 +17,26 @@ const schema = z.object({
 
 export async function POST(request: Request) {
   try {
-    await requireApiKey(request);
+    await requireSupabaseUser(request);
     const payload = schema.parse(await request.json());
     const result = await importProductsFromCSV(payload.csv);
     return NextResponse.json(result);
   } catch (error) {
-    if (error instanceof ApiKeyError) {
-      return NextResponse.json({ error: error.message }, { status: error.status });
+    if (error instanceof SupabaseAuthError) {
+      return NextResponse.json(
+        { message: error.message, code: error.code, details: error.details },
+        { status: error.status }
+      );
     }
     if (error instanceof ComplianceError) {
-      return NextResponse.json({ error: error.message }, { status: error.status });
+      return NextResponse.json(
+        { message: error.message, code: "COMPLIANCE_ERROR" },
+        { status: error.status }
+      );
     }
-    return NextResponse.json({ error: "Invalid request" }, { status: 400 });
+    return NextResponse.json(
+      { message: "Invalid request", code: "INVALID_REQUEST" },
+      { status: 400 }
+    );
   }
 }

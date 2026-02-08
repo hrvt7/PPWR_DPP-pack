@@ -4,6 +4,10 @@ import {
   ComplianceError,
   createProductManual
 } from "../../../../../src/compliance/reportService";
+import {
+  requireSupabaseUser,
+  SupabaseAuthError
+} from "../../../../../src/auth/requireSupabaseUser";
 
 export const runtime = "nodejs";
 
@@ -41,13 +45,26 @@ const schema = z
 
 export async function POST(request: Request) {
   try {
+    await requireSupabaseUser(request);
     const payload = schema.parse(await request.json());
     const product = await createProductManual(payload);
     return NextResponse.json({ product_id: product.id });
   } catch (error) {
-    if (error instanceof ComplianceError) {
-      return NextResponse.json({ error: error.message }, { status: error.status });
+    if (error instanceof SupabaseAuthError) {
+      return NextResponse.json(
+        { message: error.message, code: error.code, details: error.details },
+        { status: error.status }
+      );
     }
-    return NextResponse.json({ error: "Invalid request" }, { status: 400 });
+    if (error instanceof ComplianceError) {
+      return NextResponse.json(
+        { message: error.message, code: "COMPLIANCE_ERROR" },
+        { status: error.status }
+      );
+    }
+    return NextResponse.json(
+      { message: "Invalid request", code: "INVALID_REQUEST" },
+      { status: 400 }
+    );
   }
 }

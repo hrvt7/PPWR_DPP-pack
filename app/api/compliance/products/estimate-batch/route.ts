@@ -1,6 +1,10 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { estimateMissingDimensionsBatch } from "../../../../../src/compliance/batchEstimate";
+import {
+  requireSupabaseUser,
+  SupabaseAuthError
+} from "../../../../../src/auth/requireSupabaseUser";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -15,6 +19,7 @@ const schema = z.object({
 
 export async function POST(request: Request) {
   try {
+    await requireSupabaseUser(request);
     const payload = schema.parse(await request.json());
     if (!payload.product_ids?.length && !payload.store_id) {
       return NextResponse.json(
@@ -33,6 +38,15 @@ export async function POST(request: Request) {
 
     return NextResponse.json(result);
   } catch (error) {
-    return NextResponse.json({ error: "Invalid request" }, { status: 400 });
+    if (error instanceof SupabaseAuthError) {
+      return NextResponse.json(
+        { message: error.message, code: error.code, details: error.details },
+        { status: error.status }
+      );
+    }
+    return NextResponse.json(
+      { message: "Invalid request", code: "INVALID_REQUEST" },
+      { status: 400 }
+    );
   }
 }

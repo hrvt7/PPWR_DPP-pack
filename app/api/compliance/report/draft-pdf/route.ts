@@ -4,6 +4,10 @@ import { getSupabaseServerClient } from "../../../../../lib/supabase";
 import { generatePPWRLegalPdf } from "../../../../../src/compliance/ppwrLegalPdf";
 import { decideReportEligibility } from "../../../../../src/compliance/reportEligibility";
 import { getProductById, getReportById } from "../../../../../src/compliance/reportService";
+import {
+  requireSupabaseUser,
+  SupabaseAuthError
+} from "../../../../../src/auth/requireSupabaseUser";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -14,6 +18,7 @@ const schema = z.object({
 
 export async function POST(request: Request) {
   try {
+    await requireSupabaseUser(request);
     const payload = schema.parse(await request.json());
     const supabase = getSupabaseServerClient();
     if (!supabase) {
@@ -112,11 +117,23 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ pdf_url: publicUrl.publicUrl });
   } catch (error) {
+    if (error instanceof SupabaseAuthError) {
+      return NextResponse.json(
+        { message: error.message, code: error.code, details: error.details },
+        { status: error.status }
+      );
+    }
     if (error instanceof z.ZodError) {
-      return NextResponse.json({ error: "Invalid request" }, { status: 400 });
+      return NextResponse.json(
+        { message: "Invalid request", code: "INVALID_REQUEST" },
+        { status: 400 }
+      );
     }
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Draft PDF failed" },
+      {
+        message: error instanceof Error ? error.message : "Draft PDF failed",
+        code: "DRAFT_PDF_FAILED"
+      },
       { status: 500 }
     );
   }
