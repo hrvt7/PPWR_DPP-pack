@@ -2,6 +2,10 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getSupabaseServerClient } from "../../../../../lib/supabase";
 import { logComplianceAction } from "../../../../../src/compliance/auditLog";
+import {
+  requireSupabaseUser,
+  SupabaseAuthError
+} from "../../../../../src/auth/requireSupabaseUser";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -13,6 +17,7 @@ const schema = z.object({
 
 export async function POST(request: Request) {
   try {
+    await requireSupabaseUser(request);
     const payload = schema.parse(await request.json());
     const supabase = getSupabaseServerClient();
     if (!supabase) {
@@ -85,11 +90,23 @@ export async function POST(request: Request) {
       confirmed_by: payload.actor_id
     });
   } catch (error) {
+    if (error instanceof SupabaseAuthError) {
+      return NextResponse.json(
+        { message: error.message, code: error.code, details: error.details },
+        { status: error.status }
+      );
+    }
     if (error instanceof z.ZodError) {
-      return NextResponse.json({ error: "Invalid request" }, { status: 400 });
+      return NextResponse.json(
+        { message: "Invalid request", code: "INVALID_REQUEST" },
+        { status: 400 }
+      );
     }
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Confirmation failed" },
+      {
+        message: error instanceof Error ? error.message : "Confirmation failed",
+        code: "CONFIRM_FAILED"
+      },
       { status: 500 }
     );
   }

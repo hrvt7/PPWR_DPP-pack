@@ -5,7 +5,10 @@ import * as XLSX from "xlsx";
 import { getSupabaseServerClient } from "../../../../lib/supabase";
 import { mapMaterialCategory } from "../../../../src/compliance/eprReportingService";
 import { generateEprQuarterlyPdf } from "../../../../src/compliance/eprQuarterlyPdf";
-import { ApiKeyError, requireApiKey } from "../../../../src/auth/requireApiKey";
+import {
+  requireSupabaseUser,
+  SupabaseAuthError
+} from "../../../../src/auth/requireSupabaseUser";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -29,12 +32,18 @@ function parseQuarter(period: string) {
 
 export async function POST(request: Request) {
   try {
-    await requireApiKey(request);
+    await requireSupabaseUser(request);
   } catch (error) {
-    if (error instanceof ApiKeyError) {
-      return NextResponse.json({ error: error.message }, { status: error.status });
+    if (error instanceof SupabaseAuthError) {
+      return NextResponse.json(
+        { message: error.message, code: error.code, details: error.details },
+        { status: error.status }
+      );
     }
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return NextResponse.json(
+      { message: "Unauthorized", code: "UNAUTHORIZED" },
+      { status: 401 }
+    );
   }
 
   const supabase = getSupabaseServerClient();

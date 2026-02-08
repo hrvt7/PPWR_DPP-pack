@@ -2,6 +2,10 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getSupabaseServerClient } from "../../../../../../lib/supabase";
 import { logComplianceAction } from "../../../../../../src/compliance/auditLog";
+import {
+  requireSupabaseUser,
+  SupabaseAuthError
+} from "../../../../../../src/auth/requireSupabaseUser";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -19,10 +23,25 @@ type RouteParams = {
 };
 
 export async function POST(request: Request, context: RouteParams) {
+  try {
+    await requireSupabaseUser(request);
+  } catch (error) {
+    if (error instanceof SupabaseAuthError) {
+      return NextResponse.json(
+        { message: error.message, code: error.code, details: error.details },
+        { status: error.status }
+      );
+    }
+    return NextResponse.json(
+      { message: "Unauthorized", code: "UNAUTHORIZED" },
+      { status: 401 }
+    );
+  }
+
   const productId = context.params.product_id;
   if (!productId) {
     return NextResponse.json(
-      { error: "Product id is required" },
+      { message: "Product id is required", code: "INVALID_REQUEST" },
       { status: 400 }
     );
   }
@@ -38,7 +57,7 @@ export async function POST(request: Request, context: RouteParams) {
   const supabase = getSupabaseServerClient();
   if (!supabase) {
     return NextResponse.json(
-      { error: "Supabase is not configured" },
+      { message: "Supabase is not configured", code: "SUPABASE_UNAVAILABLE" },
       { status: 500 }
     );
   }
@@ -52,11 +71,17 @@ export async function POST(request: Request, context: RouteParams) {
     .maybeSingle();
 
   if (fetchError) {
-    return NextResponse.json({ error: "Failed to fetch product" }, { status: 500 });
+    return NextResponse.json(
+      { message: "Failed to fetch product", code: "FETCH_FAILED" },
+      { status: 500 }
+    );
   }
 
   if (!product) {
-    return NextResponse.json({ error: "Product not found" }, { status: 404 });
+    return NextResponse.json(
+      { message: "Product not found", code: "NOT_FOUND" },
+      { status: 404 }
+    );
   }
 
   if (product.packaging_status === "confirmed") {
@@ -82,7 +107,7 @@ export async function POST(request: Request, context: RouteParams) {
     height <= 0
   ) {
     return NextResponse.json(
-      { error: "Packaging dimensions are required for confirmation" },
+      { message: "Packaging dimensions are required for confirmation", code: "INVALID_REQUEST" },
       { status: 400 }
     );
   }
@@ -100,7 +125,7 @@ export async function POST(request: Request, context: RouteParams) {
 
   if (updateError) {
     return NextResponse.json(
-      { error: "Failed to confirm packaging" },
+      { message: "Failed to confirm packaging", code: "UPDATE_FAILED" },
       { status: 500 }
     );
   }
