@@ -26,10 +26,7 @@ export async function POST(request: Request) {
     const payload = schema.parse(await request.json());
     const supabase = getSupabaseServerClient();
     if (!supabase) {
-      return NextResponse.json(
-        { error: "Supabase is not configured" },
-        { status: 500 }
-      );
+      return NextResponse.json({ message: "Supabase is not configured" }, { status: 500 });
     }
 
     const estimate = await estimateProductDimensions({
@@ -52,10 +49,7 @@ export async function POST(request: Request) {
         .eq("id", payload.product_id);
 
       if (updateError) {
-        return NextResponse.json(
-          { error: "Failed to update product" },
-          { status: 500 }
-        );
+        return NextResponse.json({ message: "Failed to update product" }, { status: 500 });
       }
     }
 
@@ -71,22 +65,13 @@ export async function POST(request: Request) {
     });
   } catch (error) {
     if (error instanceof SupabaseAuthError) {
-      return NextResponse.json(
-        { message: error.message, code: error.code, details: error.details },
-        { status: error.status }
-      );
+      return NextResponse.json({ message: error.message }, { status: error.status });
     }
     if (error instanceof z.ZodError) {
-      return NextResponse.json(
-        { message: "Invalid request", code: "INVALID_REQUEST" },
-        { status: 400 }
-      );
+      return NextResponse.json({ message: "Invalid request" }, { status: 400 });
     }
     return NextResponse.json(
-      {
-        message: error instanceof Error ? error.message : "Estimation failed",
-        code: "ESTIMATE_FAILED"
-      },
+      { message: error instanceof Error ? error.message : "Estimation failed" },
       { status: 500 }
     );
   }

@@ -23,7 +23,7 @@ export async function POST(request: Request) {
     const payload = schema.parse(await request.json());
     if (!payload.product_ids?.length && !payload.store_id) {
       return NextResponse.json(
-        { error: "product_ids or store_id is required" },
+        { message: "product_ids or store_id is required" },
         { status: 400 }
       );
     }
@@ -39,14 +39,8 @@ export async function POST(request: Request) {
     return NextResponse.json(result);
   } catch (error) {
     if (error instanceof SupabaseAuthError) {
-      return NextResponse.json(
-        { message: error.message, code: error.code, details: error.details },
-        { status: error.status }
-      );
+      return NextResponse.json({ message: error.message }, { status: error.status });
     }
-    return NextResponse.json(
-      { message: "Invalid request", code: "INVALID_REQUEST" },
-      { status: 400 }
-    );
+    return NextResponse.json({ message: "Invalid request" }, { status: 400 });
   }
 }

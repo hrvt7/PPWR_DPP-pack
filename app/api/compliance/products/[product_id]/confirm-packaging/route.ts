@@ -27,23 +27,14 @@ export async function POST(request: Request, context: RouteParams) {
     await requireSupabaseUser(request);
   } catch (error) {
     if (error instanceof SupabaseAuthError) {
-      return NextResponse.json(
-        { message: error.message, code: error.code, details: error.details },
-        { status: error.status }
-      );
+      return NextResponse.json({ message: error.message }, { status: error.status });
     }
-    return NextResponse.json(
-      { message: "Unauthorized", code: "UNAUTHORIZED" },
-      { status: 401 }
-    );
+    return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
   }
 
   const productId = context.params.product_id;
   if (!productId) {
-    return NextResponse.json(
-      { message: "Product id is required", code: "INVALID_REQUEST" },
-      { status: 400 }
-    );
+    return NextResponse.json({ message: "Product id is required" }, { status: 400 });
   }
 
   let payload: z.infer<typeof schema> = undefined;
@@ -56,10 +47,7 @@ export async function POST(request: Request, context: RouteParams) {
 
   const supabase = getSupabaseServerClient();
   if (!supabase) {
-    return NextResponse.json(
-      { message: "Supabase is not configured", code: "SUPABASE_UNAVAILABLE" },
-      { status: 500 }
-    );
+    return NextResponse.json({ message: "Supabase is not configured" }, { status: 500 });
   }
 
   const { data: product, error: fetchError } = await supabase
@@ -71,17 +59,11 @@ export async function POST(request: Request, context: RouteParams) {
     .maybeSingle();
 
   if (fetchError) {
-    return NextResponse.json(
-      { message: "Failed to fetch product", code: "FETCH_FAILED" },
-      { status: 500 }
-    );
+    return NextResponse.json({ message: "Failed to fetch product" }, { status: 500 });
   }
 
   if (!product) {
-    return NextResponse.json(
-      { message: "Product not found", code: "NOT_FOUND" },
-      { status: 404 }
-    );
+    return NextResponse.json({ message: "Product not found" }, { status: 404 });
   }
 
   if (product.packaging_status === "confirmed") {
@@ -107,7 +89,7 @@ export async function POST(request: Request, context: RouteParams) {
     height <= 0
   ) {
     return NextResponse.json(
-      { message: "Packaging dimensions are required for confirmation", code: "INVALID_REQUEST" },
+      { message: "Packaging dimensions are required for confirmation" },
       { status: 400 }
     );
   }
@@ -124,10 +106,7 @@ export async function POST(request: Request, context: RouteParams) {
     .eq("id", productId);
 
   if (updateError) {
-    return NextResponse.json(
-      { message: "Failed to confirm packaging", code: "UPDATE_FAILED" },
-      { status: 500 }
-    );
+    return NextResponse.json({ message: "Failed to confirm packaging" }, { status: 500 });
   }
 
   await logComplianceAction({

@@ -35,23 +35,14 @@ export async function POST(request: Request) {
     await requireSupabaseUser(request);
   } catch (error) {
     if (error instanceof SupabaseAuthError) {
-      return NextResponse.json(
-        { message: error.message, code: error.code, details: error.details },
-        { status: error.status }
-      );
+      return NextResponse.json({ message: error.message }, { status: error.status });
     }
-    return NextResponse.json(
-      { message: "Unauthorized", code: "UNAUTHORIZED" },
-      { status: 401 }
-    );
+    return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
   }
 
   const supabase = getSupabaseServerClient();
   if (!supabase) {
-    return NextResponse.json(
-      { error: "Supabase is not configured" },
-      { status: 500 }
-    );
+    return NextResponse.json({ message: "Supabase is not configured" }, { status: 500 });
   }
 
   const url = new URL(request.url);
@@ -72,10 +63,7 @@ export async function POST(request: Request) {
       : null);
 
   if (!start || !end) {
-    return NextResponse.json(
-      { error: "Missing period or start/end dates" },
-      { status: 400 }
-    );
+    return NextResponse.json({ message: "Missing period or start/end dates" }, { status: 400 });
   }
 
   const { data: products, error } = await supabase
@@ -85,10 +73,7 @@ export async function POST(request: Request) {
     .lte("created_at", end.toISOString());
 
   if (error) {
-    return NextResponse.json(
-      { error: "Failed to load products" },
-      { status: 500 }
-    );
+    return NextResponse.json({ message: "Failed to load products" }, { status: 500 });
   }
 
   const totals = new Map<string, number>();
@@ -132,7 +117,7 @@ export async function POST(request: Request) {
       upsert: true
     });
   if (xlsxError) {
-    return NextResponse.json({ error: "Failed to upload XLSX" }, { status: 500 });
+    return NextResponse.json({ message: "Failed to upload XLSX" }, { status: 500 });
   }
 
   const { error: pdfError } = await supabase.storage
@@ -142,7 +127,7 @@ export async function POST(request: Request) {
       upsert: true
     });
   if (pdfError) {
-    return NextResponse.json({ error: "Failed to upload PDF" }, { status: 500 });
+    return NextResponse.json({ message: "Failed to upload PDF" }, { status: 500 });
   }
 
   const { data: xlsxUrl } = supabase.storage.from(bucket).getPublicUrl(xlsxPath);
@@ -158,7 +143,7 @@ export async function POST(request: Request) {
     created_at: new Date().toISOString()
   });
   if (insertError) {
-    return NextResponse.json({ error: "Failed to persist export" }, { status: 500 });
+    return NextResponse.json({ message: "Failed to persist export" }, { status: 500 });
   }
 
   return NextResponse.json({

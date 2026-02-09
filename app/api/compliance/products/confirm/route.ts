@@ -21,10 +21,7 @@ export async function POST(request: Request) {
     const payload = schema.parse(await request.json());
     const supabase = getSupabaseServerClient();
     if (!supabase) {
-      return NextResponse.json(
-        { error: "Supabase is not configured" },
-        { status: 500 }
-      );
+      return NextResponse.json({ message: "Supabase is not configured" }, { status: 500 });
     }
 
     const { data: product, error: fetchError } = await supabase
@@ -34,11 +31,11 @@ export async function POST(request: Request) {
       .maybeSingle();
 
     if (fetchError) {
-      return NextResponse.json({ error: "Failed to fetch product" }, { status: 500 });
+      return NextResponse.json({ message: "Failed to fetch product" }, { status: 500 });
     }
 
     if (!product) {
-      return NextResponse.json({ error: "Product not found" }, { status: 404 });
+      return NextResponse.json({ message: "Product not found" }, { status: 404 });
     }
 
     const length = Number(product.length_cm);
@@ -53,10 +50,7 @@ export async function POST(request: Request) {
       width <= 0 ||
       height <= 0
     ) {
-      return NextResponse.json(
-        { error: "Product dimensions missing" },
-        { status: 400 }
-      );
+      return NextResponse.json({ message: "Product dimensions missing" }, { status: 400 });
     }
 
     const confirmedAt = new Date().toISOString();
@@ -71,10 +65,7 @@ export async function POST(request: Request) {
       .eq("id", payload.product_id);
 
     if (updateError) {
-      return NextResponse.json(
-        { error: "Failed to confirm packaging" },
-        { status: 500 }
-      );
+      return NextResponse.json({ message: "Failed to confirm packaging" }, { status: 500 });
     }
 
     await logComplianceAction({
@@ -91,22 +82,13 @@ export async function POST(request: Request) {
     });
   } catch (error) {
     if (error instanceof SupabaseAuthError) {
-      return NextResponse.json(
-        { message: error.message, code: error.code, details: error.details },
-        { status: error.status }
-      );
+      return NextResponse.json({ message: error.message }, { status: error.status });
     }
     if (error instanceof z.ZodError) {
-      return NextResponse.json(
-        { message: "Invalid request", code: "INVALID_REQUEST" },
-        { status: 400 }
-      );
+      return NextResponse.json({ message: "Invalid request" }, { status: 400 });
     }
     return NextResponse.json(
-      {
-        message: error instanceof Error ? error.message : "Confirmation failed",
-        code: "CONFIRM_FAILED"
-      },
+      { message: error instanceof Error ? error.message : "Confirmation failed" },
       { status: 500 }
     );
   }
