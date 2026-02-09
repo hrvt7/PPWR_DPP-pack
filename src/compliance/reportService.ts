@@ -511,10 +511,13 @@ export async function finalizeReport(reportId: string) {
     throw new ComplianceError("Report not found", 404);
   }
   if (report.status === "final") {
+    const dppId =
+      (report.dpp_json as { dpp_id?: string | null } | null)?.dpp_id ?? undefined;
     return {
       pdf_url: report.pdf_url ?? "",
       qr_ppwr_url: report.qr_ppwr_url ?? "",
-      qr_dpp_url: report.qr_dpp_url ?? ""
+      qr_dpp_url: report.qr_dpp_url ?? "",
+      dpp_id: dppId
     };
   }
 
