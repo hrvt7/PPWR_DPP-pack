@@ -6,6 +6,10 @@ import {
   getProductById,
   getReportById
 } from "../../../../../src/compliance/reportService";
+import {
+  requireSupabaseUser,
+  SupabaseAuthError
+} from "../../../../../src/auth/requireSupabaseUser";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -19,6 +23,20 @@ export async function GET(
     const includeProduct = url.searchParams.get("include") === "product";
     const verify = url.searchParams.get("verify") === "1";
     const hash = url.searchParams.get("hash");
+
+    if (!verify) {
+      try {
+        await requireSupabaseUser(request);
+      } catch (error) {
+        if (error instanceof SupabaseAuthError) {
+          return NextResponse.json(
+            { message: error.message, code: error.code },
+            { status: error.status }
+          );
+        }
+        return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
+      }
+    }
 
     if (verify) {
       const secret = process.env.COMPLIANCE_QR_SECRET;

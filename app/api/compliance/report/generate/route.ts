@@ -25,10 +25,20 @@ export async function POST(request: Request) {
       distance_km: payload.distance_km ?? null,
       destination_country: payload.destination_country ?? null
     });
-    return NextResponse.json({ report });
+    return NextResponse.json({
+      report,
+      pdf_url: report.pdf_url ?? null,
+      qr_ppwr_url: report.qr_ppwr_url ?? null,
+      qr_dpp_url: report.qr_dpp_url ?? null,
+      qr_url: report.qr_dpp_url ?? report.qr_ppwr_url ?? null,
+      public_dpp_url: null
+    });
   } catch (error) {
     if (error instanceof SupabaseAuthError) {
-      return NextResponse.json({ message: error.message }, { status: error.status });
+      return NextResponse.json(
+        { message: error.message, code: error.code },
+        { status: error.status }
+      );
     }
     if (error instanceof ComplianceError) {
       return NextResponse.json({ message: error.message }, { status: error.status });

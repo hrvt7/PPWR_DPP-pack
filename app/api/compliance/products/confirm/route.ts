@@ -82,7 +82,10 @@ export async function POST(request: Request) {
     });
   } catch (error) {
     if (error instanceof SupabaseAuthError) {
-      return NextResponse.json({ message: error.message }, { status: error.status });
+      return NextResponse.json(
+        { message: error.message, code: error.code },
+        { status: error.status }
+      );
     }
     if (error instanceof z.ZodError) {
       return NextResponse.json({ message: "Invalid request" }, { status: 400 });
