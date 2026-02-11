@@ -1,57 +1,33 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import {
-  ComplianceError,
-  importProductsFromCSV,
-} from "../../../../../src/compliance/reportService";
-import {
-  requireSupabaseUser,
-  SupabaseAuthError,
-} from "../../../../../src/auth/requireSupabaseUser";
+
+import { ComplianceError, importProductsFromCSV } from "../../../../../src/compliance/reportService";
+import { requireSupabaseUser, SupabaseAuthError } from "../../../../../src/auth/requireSupabaseUser";
 
 export const runtime = "nodejs";
 
 /**
- * CORS
- * - Frontend (complipack-pro.vercel.app) hívja a backendet (ppwr-dpp-pack.vercel.app) böngészőből
- * - Kell OPTIONS + Access-Control-Allow-* headerek
- *
- * Biztonságosabb: csak engedélyezett origin(ek)nek adunk vissza CORS-t.
+ * Allowed frontend origins (production + previews if needed)
+ * Add more if you use other domains.
  */
 const ALLOWED_ORIGINS = new Set<string>([
   "https://complipack-pro.vercel.app",
-  // preview deploymentek vercel-en (ha kell). Ha nem akarod, töröld.
-  // "https://complipack-pro-git-fix-mvp-stabilize-hrvt7s-projects.vercel.app",
-  // "https://complipack-c95vab9e3-hrvt7s-projects.vercel.app",
+  "https://complipack-pro-c95vab9e3-hrvt7s-projects.vercel.app",
+  // If you still have another prod domain, add it here:
+  // "https://complipack.vercel.app",
 ]);
 
-function getCorsOrigin(req: Request) {
-  const origin = req.headers.get("origin");
-  if (!origin) return null;
+function getCorsHeaders(origin: string | null) {
+  const allowOrigin =
+    origin && ALLOWED_ORIGINS.has(origin) ? origin : "https://complipack-pro.vercel.app";
 
-  // Engedélyezett lista
-  if (ALLOWED_ORIGINS.has(origin)) return origin;
-
-  // Opció: minden vercel preview (csak hrvt7s-projects alatt) — ha akarod, hagyd bent
-  // Ezzel nem kell kézzel felvenni minden preview domaint.
-  if (/^https:\/\/complipack-[a-z0-9-]+-hrvt7s-projects\.vercel\.app$/i.test(origin)) {
-    return origin;
-  }
-
-  return null;
-}
-
-function corsHeaders(req: Request) {
-  const corsOrigin = getCorsOrigin(req);
   return {
-    // ha nem engedélyezett origin, inkább ne adjunk CORS-t
-    ...(corsOrigin ? { "Access-Control-Allow-Origin": corsOrigin } : {}),
-    "Access-Control-Allow-Methods": "POST, OPTIONS",
-    "Access-Control-Allow-Headers": "Content-Type, Authorization",
+    "Access-Control-Allow-Origin": allowOrigin,
+    "Access-Control-Allow-Methods": "POST,OPTIONS",
+    "Access-Control-Allow-Headers": "authorization,content-type",
     "Access-Control-Max-Age": "86400",
-    // cache-ek miatt jó jelölni
     "Vary": "Origin",
-  };
+  } as Record<string, string>;
 }
 
 const schema = z.object({
@@ -59,50 +35,39 @@ const schema = z.object({
 });
 
 export async function OPTIONS(request: Request) {
-  // Preflight requestre 200 + CORS headerek
-  return new NextResponse(null, {
-    status: 200,
-    headers: corsHeaders(request),
-  });
+  const origin = request.headers.get("origin");
+  return new NextResponse(null, { status: 204, headers: getCorsHeaders(origin) });
 }
 
 export async function POST(request: Request) {
+  const origin = request.headers.get("origin");
+  const corsHeaders = getCorsHeaders(origin);
+
   try {
     await requireSupabaseUser(request);
 
     const payload = schema.parse(await request.json());
     const result = await importProductsFromCSV(payload.csv);
 
-    return NextResponse.json(result, {
-      headers: corsHeaders(request),
-    });
+    return NextResponse.json(result, { status: 200, headers: corsHeaders });
   } catch (error) {
     if (error instanceof SupabaseAuthError) {
       return NextResponse.json(
         { message: error.message, code: error.code },
-        {
-          status: error.status,
-          headers: corsHeaders(request),
-        }
+        { status: error.status, headers: corsHeaders }
       );
     }
 
     if (error instanceof ComplianceError) {
       return NextResponse.json(
         { message: error.message },
-        {
-          status: error.status,
-          headers: corsHeaders(request),
-        }
+        { status: error.status, headers: corsHeaders }
       );
     }
 
     return NextResponse.json(
       { message: "Invalid request" },
-      {
-        status: 400,
-        headers: corsHeaders(request),
-      }
+      { status: 400, headers: corsHeaders }
     );
   }
 }
