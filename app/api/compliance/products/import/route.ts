@@ -13,17 +13,23 @@ export const runtime = "nodejs";
 
 /**
  * CORS
- * - Prod FE: https://complipack-pro.vercel.app
- * - Local dev FE: http://localhost:5173 (ha kell)
+ * - prod frontend: https://complipack-pro.vercel.app
+ * - local dev: http://localhost:5173, http://localhost:3000 (ha kell)
+ *
+ * Ha több preview domained van, tedd be ide.
  */
-const ALLOWED_ORIGINS = new Set<string>([
+const ALLOWED_ORIGINS = new Set([
   "https://complipack-pro.vercel.app",
   "http://localhost:5173",
   "http://localhost:3000",
 ]);
 
-function corsHeaders(origin: string | null) {
-  const allowOrigin = origin && ALLOWED_ORIGINS.has(origin) ? origin : "null";
+function getCorsHeaders(request: Request) {
+  const origin = request.headers.get("origin") ?? "";
+  const allowOrigin = ALLOWED_ORIGINS.has(origin)
+    ? origin
+    : "https://complipack-pro.vercel.app"; // fallback
+
   return {
     "Access-Control-Allow-Origin": allowOrigin,
     "Access-Control-Allow-Methods": "POST,OPTIONS",
@@ -33,39 +39,36 @@ function corsHeaders(origin: string | null) {
   };
 }
 
-const RowSchema = z.object({
+/**
+ * Payload: vagy CSV string, vagy rows lista
+ */
+const rowSchema = z.object({
   product_name: z.string().min(1),
-  length_cm: z.union([z.number(), z.string()]).transform((v) => Number(v)),
-  width_cm: z.union([z.number(), z.string()]).transform((v) => Number(v)),
-  height_cm: z.union([z.number(), z.string()]).transform((v) => Number(v)),
-  weight_kg: z.union([z.number(), z.string()]).optional().transform((v) => (v === undefined ? undefined : Number(v))),
+  length_cm: z.coerce.number(),
+  width_cm: z.coerce.number(),
+  height_cm: z.coerce.number(),
+  weight_kg: z.coerce.number().optional().nullable(),
   materials: z.string().optional().nullable(),
   description: z.string().optional().nullable(),
+  external_id: z.string().optional().nullable(),
+  source: z.string().optional().nullable(),
 });
 
-const PayloadSchema = z.union([
-  z.object({
-    csv: z.string().min(1),
-  }),
-  z.object({
-    // frontend-ek gyakran így küldik
-    rows: z.array(RowSchema).min(1),
-  }),
-  z.object({
-    // másik gyakori név
-    products: z.array(RowSchema).min(1),
-  }),
+const payloadSchema = z.union([
+  z.object({ csv: z.string().min(1) }),
+  z.object({ rows: z.array(rowSchema).min(1) }),
 ]);
 
 function escapeCsv(value: unknown) {
-  const s = value === null || value === undefined ? "" : String(value);
-  // CSV escape: ha tartalmaz " , \n akkor idézőjelezni kell, és a " duplázódik
-  if (/[",\n\r]/.test(s)) return `"${s.replace(/"/g, '""')}"`;
+  if (value === null || value === undefined) return "";
+  const s = String(value);
+  if (/[",\n]/.test(s)) return `"${s.replace(/"/g, '""')}"`;
   return s;
 }
 
-function rowsToCsv(rows: Array<z.infer<typeof RowSchema>>) {
-  const header = [
+function rowsToCsv(rows: Array<z.infer<typeof rowSchema>>) {
+  // Ez a header sorrend legyen stabil (a reportService ezt várhatja).
+  const headers = [
     "product_name",
     "length_cm",
     "width_cm",
@@ -73,73 +76,72 @@ function rowsToCsv(rows: Array<z.infer<typeof RowSchema>>) {
     "weight_kg",
     "materials",
     "description",
-  ].join(",");
+    "external_id",
+    "source",
+  ];
 
-  const lines = rows.map((r) =>
-    [
-      escapeCsv(r.product_name),
-      escapeCsv(r.length_cm),
-      escapeCsv(r.width_cm),
-      escapeCsv(r.height_cm),
-      escapeCsv(r.weight_kg ?? ""),
-      escapeCsv(r.materials ?? ""),
-      escapeCsv(r.description ?? ""),
-    ].join(",")
-  );
+  const lines = [
+    headers.join(","),
+    ...rows.map((r) =>
+      headers
+        .map((h) => escapeCsv((r as any)[h]))
+        .join(",")
+    ),
+  ];
 
-  return [header, ...lines].join("\n");
+  return lines.join("\n");
 }
 
 export async function OPTIONS(request: Request) {
-  const origin = request.headers.get("origin");
-  return new NextResponse(null, { status: 204, headers: corsHeaders(origin) });
+  return new NextResponse(null, { status: 204, headers: getCorsHeaders(request) });
 }
 
 export async function POST(request: Request) {
-  const origin = request.headers.get("origin");
+  const cors = getCorsHeaders(request);
 
   try {
+    // 1) Auth
     await requireSupabaseUser(request);
 
-    const raw = await request.json();
-    const payload = PayloadSchema.parse(raw);
+    // 2) Parse payload
+    const json = await request.json().catch(() => null);
+    const parsed = payloadSchema.safeParse(json);
 
-    let csv: string;
-
-    if ("csv" in payload) {
-      csv = payload.csv;
-    } else if ("rows" in payload) {
-      csv = rowsToCsv(payload.rows);
-    } else {
-      csv = rowsToCsv(payload.products);
+    if (!parsed.success) {
+      return NextResponse.json(
+        {
+          message: "Invalid request",
+          details: parsed.error.flatten(),
+          expected: "Send { csv: string } OR { rows: ParsedRow[] }",
+        },
+        { status: 400, headers: cors }
+      );
     }
 
+    // 3) Normalize -> CSV
+    const csv =
+      "csv" in parsed.data ? parsed.data.csv : rowsToCsv(parsed.data.rows);
+
+    // 4) Import
     const result = await importProductsFromCSV(csv);
-    return NextResponse.json(result, { headers: corsHeaders(origin) });
+
+    return NextResponse.json(result, { headers: cors });
   } catch (error) {
-    // Fontos: ERROR-ra is tegyük rá a CORS headert, különben a böngésző “Failed to fetch”-et dob.
     if (error instanceof SupabaseAuthError) {
       return NextResponse.json(
         { message: error.message, code: error.code },
-        { status: error.status, headers: corsHeaders(origin) }
+        { status: error.status, headers: cors }
       );
     }
     if (error instanceof ComplianceError) {
       return NextResponse.json(
         { message: error.message },
-        { status: error.status, headers: corsHeaders(origin) }
-      );
-    }
-    if (error instanceof z.ZodError) {
-      return NextResponse.json(
-        { message: "Invalid request", details: error.flatten() },
-        { status: 400, headers: corsHeaders(origin) }
+        { status: error.status, headers: cors }
       );
     }
 
-    return NextResponse.json(
-      { message: "Invalid request" },
-      { status: 400, headers: corsHeaders(origin) }
-    );
+    // fallback
+    const message = error instanceof Error ? error.message : "Invalid request";
+    return NextResponse.json({ message }, { status: 400, headers: cors });
   }
 }
