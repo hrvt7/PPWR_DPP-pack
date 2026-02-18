@@ -39,7 +39,10 @@ export async function POST(request: Request) {
     return NextResponse.json(result);
   } catch (error) {
     if (error instanceof SupabaseAuthError) {
-      return NextResponse.json({ message: error.message }, { status: error.status });
+      return NextResponse.json(
+        { message: error.message, code: error.code },
+        { status: error.status }
+      );
     }
     return NextResponse.json({ message: "Invalid request" }, { status: 400 });
   }

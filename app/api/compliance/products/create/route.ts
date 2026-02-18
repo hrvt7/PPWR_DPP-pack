@@ -51,7 +51,10 @@ export async function POST(request: Request) {
     return NextResponse.json({ product_id: product.id });
   } catch (error) {
     if (error instanceof SupabaseAuthError) {
-      return NextResponse.json({ message: error.message }, { status: error.status });
+      return NextResponse.json(
+        { message: error.message, code: error.code },
+        { status: error.status }
+      );
     }
     if (error instanceof ComplianceError) {
       return NextResponse.json({ message: error.message }, { status: error.status });

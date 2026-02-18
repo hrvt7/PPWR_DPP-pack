@@ -27,7 +27,10 @@ export async function POST(request: Request, context: RouteParams) {
     await requireSupabaseUser(request);
   } catch (error) {
     if (error instanceof SupabaseAuthError) {
-      return NextResponse.json({ message: error.message }, { status: error.status });
+      return NextResponse.json(
+        { message: error.message, code: error.code },
+        { status: error.status }
+      );
     }
     return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
   }

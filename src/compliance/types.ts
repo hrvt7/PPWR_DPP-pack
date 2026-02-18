@@ -15,8 +15,8 @@ export type Product = {
   weight_kg?: number | null;
   packaging_material_type?: PackagingMaterialType | null;
   packaging_status?: PackagingStatus;
-  confirmed_at?: Date;
-  confirmed_by?: string;
+  confirmed_at?: Date | null;
+  confirmed_by?: string | null;
   updated_at?: Date;
   created_at: Date;
 };

@@ -35,7 +35,10 @@ export async function POST(request: Request) {
     await requireSupabaseUser(request);
   } catch (error) {
     if (error instanceof SupabaseAuthError) {
-      return NextResponse.json({ message: error.message }, { status: error.status });
+      return NextResponse.json(
+        { message: error.message, code: error.code },
+        { status: error.status }
+      );
     }
     return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
   }
@@ -149,6 +152,11 @@ export async function POST(request: Request) {
   return NextResponse.json({
     totals: totalsArray,
     xlsx_url: xlsxUrl.publicUrl,
-    pdf_url: pdfUrl.publicUrl
+    pdf_url: pdfUrl.publicUrl,
+    period_start: start.toISOString().slice(0, 10),
+    period_end: end.toISOString().slice(0, 10),
+    period_label: label,
+    country_code: countryCode ?? null,
+    exported_at: new Date().toISOString()
   });
 }

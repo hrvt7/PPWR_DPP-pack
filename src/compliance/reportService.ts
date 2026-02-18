@@ -511,10 +511,20 @@ export async function finalizeReport(reportId: string) {
     throw new ComplianceError("Report not found", 404);
   }
   if (report.status === "final") {
+    const dppId =
+      (report.dpp_json as { dpp_id?: string | null } | null)?.dpp_id ?? undefined;
+    const domain = process.env.APP_DOMAIN ?? "";
+    const cleanDomain = domain.replace(/\/$/, "");
+    const publicDppUrl = dppId && cleanDomain ? `${cleanDomain}/dpp/${dppId}` : null;
     return {
       pdf_url: report.pdf_url ?? "",
       qr_ppwr_url: report.qr_ppwr_url ?? "",
-      qr_dpp_url: report.qr_dpp_url ?? ""
+      qr_dpp_url: report.qr_dpp_url ?? "",
+      qr_url: report.qr_dpp_url ?? "",
+      public_dpp_url: publicDppUrl,
+      carbon_light_total: null,
+      disclaimer: process.env.CARBON_LIGHT_DISCLAIMER ?? null,
+      dpp_id: dppId
     };
   }
 
@@ -523,8 +533,15 @@ export async function finalizeReport(reportId: string) {
     throw new ComplianceError("Product not found", 404);
   }
   if (product.packaging_status !== "confirmed") {
+    if (product.packaging_status === "estimated") {
+      throw new ComplianceError(
+        "Dimensions are currently estimated. Please confirm dimensions for this product before finalizing the report.",
+        400
+      );
+    }
+
     throw new ComplianceError(
-      "Packaging dimensions must be confirmed before finalization.",
+      "Please confirm this product's packaging dimensions before finalizing the report.",
       400
     );
   }
@@ -688,6 +705,10 @@ export async function finalizeReport(reportId: string) {
     pdf_url: publicPdfUrl.publicUrl,
     qr_ppwr_url: publicPpwrQrUrl.publicUrl,
     qr_dpp_url: publicDppQrUrl.publicUrl,
+    qr_url: publicDppQrUrl.publicUrl,
+    public_dpp_url: `${domain.replace(/\/$/, "")}/dpp/${dppRecord.id}`,
+    carbon_light_total: null,
+    disclaimer: process.env.CARBON_LIGHT_DISCLAIMER ?? null,
     dpp_id: dppRecord.id
   };
 }
